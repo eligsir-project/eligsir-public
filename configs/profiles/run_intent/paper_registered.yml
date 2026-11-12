@@ -1,0 +1,49 @@
+# RUN INTENT: PAPER_REGISTERED  (issue #524)
+#
+#   python train.py --run_profile run_intent/paper_registered -s /data/... -m output/...
+#
+# Purpose: a complete publication/evidence package. Canonical-online plus the
+# completeness guarantees that are too expensive to pay on every research run.
+#
+# This file `extends:` run_intent/canonical_online.yml, so the resolved stack is
+#     default.yml  ->  canonical_online.yml  ->  paper_registered.yml
+# and only the paper-specific deltas appear below.
+#
+# THE ONE SUBSTANTIVE DELTA: score ALL eligible test cameras.
+# #524 requires the final evaluation to score every eligible test camera unless a
+# registered protocol says otherwise. Issue #420 established that
+# streaming_report_test_metrics_max subsamples the realized holdout BEFORE
+# averaging, so two runs can share realized_holdout_hash and n_test and still
+# score different cameras. A paper run must not be subject to that. 1_000_000 is
+# an effectively-unbounded cap rather than a sentinel: train_streaming.py reads
+# this via `int(getattr(args, ...))`, so a YAML `null` would raise TypeError, and
+# comparison_report's own "unlimited" path is reachable only from Python, not
+# from the CLI. Documented here so the number is not read as arbitrary.
+#
+# NOT COVERED HERE, and it matters: #524 also asks PAPER_REGISTERED to enforce
+# strict comparison/promotion verification, a complete report-regeneration
+# manifest, worst-K render/GT/residual diagnostics, mandatory experiment-origin
+# (#511) and visual-evidence linkage (#512), and LOUD FAILURE when a mandatory
+# artifact is missing. None of those can be expressed as an argparse key that
+# exists today. They are declared pending in docs/inventory/run_intents.yml, and
+# the enforcement half needs the deferred --run_intent flag (see the
+# `run_intent_cli_selection` entry in docs/inventory/promotion_policy.yml).
+# Until then, selecting this profile makes a run paper-SHAPED, not paper-VALIDATED.
+#
+# DECLARED PENDING (declared, NOT enabled):
+#   * complete metric suite            -> blocked on #426 -> #428 -> #430
+#   * experiment/task origin reference -> blocked on #511  (MANDATORY for paper)
+#   * visual evidence linkage          -> blocked on #512  (MANDATORY for paper)
+#   * self-declared run intent in report.json -> blocked on #524's deferred half
+
+extends:
+  - canonical_online.yml
+
+# Score every eligible test camera -- see the note above.
+streaming_report_test_metrics_max: 1000000
+streaming_report_train_metrics_max: 1000000
+
+# Full trajectory coverage in the evidence video, at full resolution.
+streaming_report_trajectory_max_frames: 600
+streaming_report_video_min_width: 1920
+streaming_report_video_max_width: 3840

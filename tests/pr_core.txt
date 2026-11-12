@@ -1,0 +1,30 @@
+# Required CPU-Torch contracts. Full discovery remains available separately.
+# Transport identity, admission/retention, cadence, and a real tiny closed loop.
+tests/test_ci_test_suite.py
+tests/test_runtime_contracts.py
+tests/test_dev_simulation_lane.py
+tests/test_issue1075_mapping_session.py
+tests/test_issue1075_cadence_contract.py
+tests/test_issue1075_replay_session.py
+tests/test_synthetic_gaussian_e2e_cpu.py
+tests/test_torch_cpu_reference_renderer.py
+# READY ownership, fallback, attestation, and transfer accounting.
+tests/test_ready_source_owner.py
+tests/test_ready_only_tick_selector.py
+tests/test_ready_execution_context.py
+tests/test_prepared_camera_hotpath_contract.py
+tests/test_transfer_budget_contract.py
+# Atomic writes and committed-work accounting.
+tests/test_mutation_version_contract.py
+tests/test_issue1193_mutation_atomicity.py
+tests/test_semantic_work_clocks.py
+# Batched gradients, rejection, status readbacks, and score/GT boundaries.
+tests/test_engine_batched_step.py
+tests/test_guarded_loss_accumulator.py
+tests/test_group_loss_status.py
+tests/test_objective_required_terms.py
+tests/test_objective_preflight_no_materialization.py
+tests/test_score_contract.py
+# Defaults and formerly torch-hidden reachability regressions.
+tests/test_defaults_reference_freshness.py
+tests/test_replay_buffer_reachability.py

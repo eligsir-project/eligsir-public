@@ -1,0 +1,9 @@
+{
+    "densification_strategy": "gsplat_energy_mcmc",
+    "energy_dead_mode": "energy_quantile",
+    "energy_dead_quantile": 0.10,
+    "opacity_reg": 0.001,
+    "scale_reg": 0.01,
+    "scale_kill_threshold": 0.20,
+    "mcmc_stop_growth_iter": 150000
+}

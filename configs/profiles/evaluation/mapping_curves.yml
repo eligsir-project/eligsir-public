@@ -1,0 +1,7 @@
+# Observation-only mixin: no camera model, split, score cap or mapping policy.
+# Declare this observer workload in each ResearchFlow plan. Snapshot evaluation
+# shares GPU resources; its measured overhead is not a free throughput gain.
+streaming_track_primary_psnr: true
+streaming_mapping_holdout_curve: true
+streaming_mapping_holdout_curve_async: true
+streaming_psnr_chart_interval: 100

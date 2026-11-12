@@ -1,0 +1,48 @@
+# Shared settings for every finite dataset released causally through the
+# streaming mapper (causal_replay/{tum_rgbd,scannet,replica,scannetpp}.yml).
+# Extend THIS file, not ../live/canonical_mapping.yml directly, for anything
+# that is true of causal_mapping over a finite recorded source regardless of
+# which dataset it is -- a dataset-specific profile should contain only
+# settings that follow from that dataset's own native resolution/format/fps.
+#
+# Not extended by ../live/canonical_mapping.yml's own consumers (ROS2 live
+# mapping): that path deliberately keeps every adaptive camera-sampling
+# controller off pending its own payload-residency contract (see that file's
+# comment) -- a live sensor stream cannot be subsampled the way a finite,
+# already-fully-known offline source catalogue can. hybrid_keyframe below is
+# an offline-replay-only decision, not a reversal of that live-path choice.
+extends: [../live/canonical_mapping.yml]
+
+execution_trainer: causal_mapping
+online_mode: false
+viewer: none
+streaming_ingestion_mode: dataset_fps
+
+# TUM fr3's own real recipe (the only recipe family in this investigation
+# that reached 150+ views/s) has always used hybrid_keyframe +
+# velocity_adaptive + max_gap 60 as an explicit CLI override on top of this
+# profile; every ScanNet/Replica/ScanNet++ recipe queued during this
+# investigation (PR #1933, 2026-09-08/09) instead left the profile default
+# (preselected, which admits every source frame with no motion-based
+# skipping) unchanged -- an unintentional recipe divergence, not a deliberate
+# per-dataset choice. Promoted here as the causal_replay default so every
+# dataset profile gets it uniformly; a per-dataset profile can still override
+# it if a real measurement ever shows a dataset needs something else.
+streaming_frame_admission: hybrid_keyframe
+streaming_keyframe_velocity_adaptive: true
+streaming_keyframe_max_gap: 60
+
+# --streaming_admission_prematerialize (default False, arguments/__init__.py)
+# runs the tick's own supervision-materialize path (materialize -> H2D ->
+# prepare -> write-through) at admission time instead of at first draw, so
+# an admitted frame's guaranteed first-draw miss -- measured at ~54% of all
+# m_tick_camera_materialize misses on the fr3 legacy recipe (see
+# production_application.py's _prematerialize_supervision_tier docstring,
+# issue #279/#1342) -- happens off the tick critical path. It requires a
+# concrete (non-adaptive) mapping tier to be sound (a wrong-tier guess can
+# only miss, same cost as flag-off, per _resolve_prematerialize_tier's own
+# contract) -- exactly what every causal_replay dataset profile now sets
+# (scannet.yml's measured `half`, replica.yml/scannetpp.yml's correctness-
+# driven `half` default). Never enabled for causal_replay before this;
+# ../live/canonical_mapping.yml's own inherited default stays False.
+streaming_admission_prematerialize: true

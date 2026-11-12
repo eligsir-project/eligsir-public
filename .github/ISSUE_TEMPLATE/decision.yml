@@ -1,0 +1,84 @@
+name: Research / architecture decision record
+description: Record a negative result, explicit defer, superseded direction, or evidence-backed stop decision.
+title: "Decision: "
+labels:
+  - "type:decision"
+body:
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision
+      description: State the conclusion clearly — negative, deferred/not planned, superseded, or promoted.
+      placeholder: "Decision: DEFER / NEGATIVE / SUPERSEDED / ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question that was evaluated
+      description: What hypothesis, implementation direction, or ROI question led to this decision?
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Load-bearing evidence
+      description: Link valid experiments, reports, PRs, and measurements. Include the important numbers, not only a summary sentence.
+      placeholder: "- report: ...\n- matched result: ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: consequence
+    attributes:
+      label: Consequence
+      description: What work should stop, continue separately, or change because of this decision?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reopen
+    attributes:
+      label: Reopen conditions
+      description: State the exact new evidence or dependency change that would justify revisiting this decision.
+      placeholder: "Reopen only if ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: evidence_state
+    attributes:
+      label: Evidence state
+      options:
+        - Negative
+        - Mixed
+        - Positive
+        - Replicated
+        - Deferred
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - ICRA
+        - Engineering
+        - Future
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: ledger
+    attributes:
+      label: Durable record
+      options:
+        - label: The relevant durable report / architecture evidence is linked above.
+          required: true
+        - label: docs/experiments/INDEX.md will be updated if this changes the project state of knowledge.
+          required: true
+        - label: If deferred/not planned, reopen conditions are specific enough to avoid speculative rework.
+          required: true

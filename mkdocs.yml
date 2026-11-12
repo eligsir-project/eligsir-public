@@ -1,0 +1,72 @@
+site_name: EliGSiR
+site_description: Streaming RGB-D Gaussian mapping research system
+site_url: https://eligsir-project.github.io/eligsir
+repo_url: https://github.com/eligsir-project/eligsir
+repo_name: eligsir-project/eligsir
+edit_uri: edit/main/docs/
+
+hooks:
+  - scripts/mkdocs_hook.py
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: deep purple
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+plugins:
+  - search
+  - awesome-pages
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            # Missing/unknown parameter types are source-quality concerns, not
+            # site-topology failures. Keep the Pages build strict for broken
+            # links, unresolved references, duplicate anchors, and MkDocs
+            # warnings without turning pre-existing annotation debt into a
+            # deployment outage.
+            docstring_options:
+              warn_missing_types: false
+              warn_unknown_params: false
+            show_source: true
+            show_root_heading: true
+            show_if_no_docstring: true
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - toc:
+      permalink: true

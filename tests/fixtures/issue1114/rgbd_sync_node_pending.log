@@ -1,0 +1,3 @@
+[0m[INFO] [1787495384.635116797] [eligsir_rgbd_sync_node]: pair accounting: pairs_matched=0 pairs_published=0 | color: arrived=0 published=0 pending=0 dropped=0 balanced=yes | depth: arrived=0 published=0 pending=0 dropped=0 balanced=yes[0m
+[0m[INFO] [1787495387.635206285] [eligsir_rgbd_sync_node]: pair accounting: pairs_matched=20 pairs_published=20 | color: arrived=20 published=20 pending=0 dropped=0 balanced=yes | depth: arrived=20 published=20 pending=0 dropped=0 balanced=yes[0m
+[0m[INFO] [1787495390.635097380] [eligsir_rgbd_sync_node]: pair accounting: pairs_matched=56 pairs_published=56 | color: arrived=60 published=56 pending=4 dropped=0 balanced=yes | depth: arrived=56 published=56 pending=0 dropped=0 balanced=yes[0m

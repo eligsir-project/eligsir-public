@@ -1,0 +1,219 @@
+# syntax=docker/dockerfile:1.7
+#
+# EXPERIMENTAL CUDA variant (2026-07-05) — target: an NVIDIA A100 Kubernetes
+# cluster (k3s, MIG-partitioned A100-40GB nodes). Verified end-to-end on real
+# MIG-shard hardware up through Open3D point-cloud preprocessing; a prior
+# revision based on NGC's bleeding-edge `nvcr.io/nvidia/pytorch:26.02-py3`
+# (CUDA 13.1, torch 2.11.0a0 nightly) hit
+# `NVML_SUCCESS == r INTERNAL ASSERT FAILED` inside CUDACachingAllocator
+# during camera-image loading — the cluster's driver reports
+# nvidia.com/cuda.runtime-version.full=13.0 (checked live via
+# `kubectl get node <gpu-node> -o json` labels), i.e. the 13.1 container
+# toolkit was slightly AHEAD of the node's supported runtime ceiling.
+#
+# Base image choice (revised): plain, stable `pytorch/pytorch:2.9.1-cuda12.8-cudnn9-devel`
+# (Docker Hub, verified via `skopeo list-tags` against the real current tag
+# list — not NGC's monthly nightly-style build) — CUDA 12.8, well below the
+# node's 13.0 runtime ceiling, torch 2.9.1 a real numbered stable release
+# rather than a `2.11.0a0` nightly. Base OS is Ubuntu 22.04 (jammy) with a
+# conda-managed Python 3.11 (/opt/conda) — no PEP-668 externally-managed
+# restriction here (unlike NGC's system-Python base), so plain `pip install`
+# works without --break-system-packages. This repo has no pinned torch
+# version (environment.yml's `pytorch=1.13.1` is a stale pre-ROCm-port
+# artifact, not authoritative; pyproject.toml has no torch constraint), so
+# this image's shipped torch build is used unmodified.
+#
+# Unlike the ROCm Dockerfile, there is no separate "shared base" stage to
+# hipify/rebuild from scratch — the vendored extensions (simple_knn,
+# fused-ssim) and gsplat all build directly against this image's own CUDA
+# toolchain (nvcc is already present in the devel-class image), no
+# HIP patching needed: submodules/simple-knn's .cu files guard ROCm-only
+# code behind `#ifndef __HIP_PLATFORM_AMD__`, so under plain CUDA
+# (__HIP_PLATFORM_AMD__ undefined) they compile via their original,
+# unmodified CUDA path (cooperative_groups etc.) with zero changes.
+
+FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-devel@sha256:39236c0ad9c66baecf01bb2e4f5562543c5b336c0c785887798775d6d6fdbf9a AS gsplat-builder
+
+ARG FUSED_SSIM_COMMIT=a7c48d6dd7ac6dc39a7958c7c4452e0b10418f38
+ARG GSPLAT_COMMIT=937e29912570c372bed6747a5c9bf85fed877bae
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    cmake \
+    ninja-build \
+    libglm-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# torch.utils.cpp_extension's CUDA-arch autodetection needs a live GPU or an
+# explicit TORCH_CUDA_ARCH_LIST — this build runs on a GPU-less host, so
+# without it `_get_cuda_arch_flags()` returns an empty list and crashes with
+# "IndexError: list index out of range" the moment any extension tries to
+# compile. Default pinned to Ampere-datacenter (compute capability 8.0),
+# matching the a100cluster target hardware confirmed live via `kubectl get
+# node <gpu-node> -o json`: nvidia.com/gpu.compute.major=8,
+# nvidia.com/gpu.compute.minor=0, nvidia.com/gpu.product=NVIDIA-A100-PCIE-40GB.
+# Made an ARG (2026-08-10, W3-30 NVIDIA-3090 setup task) so other real-CUDA-arch
+# targets (e.g. RTX 3090 = compute capability 8.6, "Ampere-consumer") can
+# override via --build-arg TORCH_CUDA_ARCH_LIST=8.6 without forking this file
+# or perturbing the a100cluster image's existing default. sm_80 SASS has no
+# guaranteed forward-compat to sm_86 hardware without a matching build (PTX
+# JIT fallback requires the "+PTX" suffix, not present here) — always pass
+# the arch matching the real target GPU, don't rely on the 8.0 default
+# running unmodified on non-A100 hardware.
+ARG TORCH_CUDA_ARCH_LIST=8.0
+ENV TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
+
+WORKDIR /tmp
+
+# Upstream (non-ROCm-forked) gsplat — the ROCm Dockerfile clones
+# ROCm/gsplat's patched fork; that fork's patches are ROCm-specific (hipify
+# plumbing) and unneeded/untested under plain CUDA, so this uses the
+# original nerfstudio-project/gsplat repo at the matching 1.5.3 release
+# series instead.
+RUN git clone --filter=blob:none --no-checkout https://github.com/nerfstudio-project/gsplat.git /tmp/gsplat \
+    && cd /tmp/gsplat \
+    && git fetch --depth 1 origin "${GSPLAT_COMMIT}" \
+    && git checkout --detach "${GSPLAT_COMMIT}" \
+    && git submodule update --init --recursive \
+    && MAX_JOBS="$(nproc)" python3 setup.py bdist_wheel
+
+# fused_ssim: same repo as the ROCm build; its setup.py only branches to a
+# HIP path when torch.version.hip is set, so under CUDA torch it takes the
+# plain CUDAExtension path unmodified.
+RUN git clone --depth 1 https://github.com/rahul-goel/fused-ssim.git /tmp/fused-ssim \
+    && cd /tmp/fused-ssim \
+    && git fetch --depth 1 origin "${FUSED_SSIM_COMMIT}" \
+    && git checkout --detach "${FUSED_SSIM_COMMIT}" \
+    && MAX_JOBS="$(nproc)" pip wheel . --no-build-isolation --no-deps -w /tmp/fused-ssim/dist
+
+# simple_knn: same vendored source as the ROCm build (submodules/simple-knn),
+# built directly — no CUDA_HOME=/opt/rocm override, no hipify. Its setup.py
+# is a plain CUDAExtension (see submodules/simple-knn/setup.py).
+COPY submodules/simple-knn /tmp/simple-knn
+RUN cd /tmp/simple-knn \
+    && MAX_JOBS="$(nproc)" pip wheel . --no-build-isolation --no-deps -w /tmp/simple-knn/dist
+
+# =============================================================================
+# STAGE: shared EliGSiR Python dependencies
+# =============================================================================
+FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-devel@sha256:39236c0ad9c66baecf01bb2e4f5562543c5b336c0c785887798775d6d6fdbf9a AS eligsir-deps
+
+ENV DEBIAN_FRONTEND=noninteractive
+# Base is a conda-managed Python (/opt/conda), not PEP-668 externally-managed
+# system Python (unlike the earlier NGC-based revision) — plain pip/uv work
+# without --break-system-packages here.
+
+# open3d's bundled shared library dynamically links X11/GL runtime libs even
+# for headless (no-display) use; the ROCm base image apparently carries these
+# transitively (never installed explicitly in the ROCm Dockerfile either) but
+# neither CUDA base does — found live via a k8s smoke-test failure:
+# "Open3D import failed: libX11.so.6: cannot open shared object file".
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libx11-6 \
+    libgl1 \
+    libgomp1 \
+    libxrender1 \
+    libxext6 \
+    libsm6 \
+    libice6 \
+    libxi6 \
+    libusb-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+# Lock torch/torchvision/torchaudio to the CUDA builds already present in the
+# base image (mirrors the ROCm Dockerfile's defense-in-depth constraint —
+# see memory dockerfile-torch-clobber-rootcause.md: extension wheel builds
+# and later pip installs must not let the resolver pull in a different
+# (possibly CPU-only or mismatched-CUDA-version) torch from PyPI).
+RUN python - <<'PY' > /etc/pip-torch-constraint.txt
+import importlib.metadata as md
+for name in ("torch", "torchvision", "torchaudio"):
+    try:
+        print(f"{name}=={md.version(name)}")
+    except md.PackageNotFoundError:
+        pass
+PY
+ENV PIP_CONSTRAINT=/etc/pip-torch-constraint.txt
+ENV UV_CONSTRAINT=/etc/pip-torch-constraint.txt
+
+RUN uv pip install --system --no-cache \
+    "numpy<2" \
+    plyfile \
+    tqdm \
+    opencv-python-headless \
+    rich \
+    jaxtyping \
+    rosbags \
+    tensorboard \
+    open3d \
+    h5py \
+    pyrealsense2 \
+    pytest
+
+RUN uv pip install --system --no-cache "rerun-sdk>=0.21" "numpy<2"
+
+RUN --mount=from=gsplat-builder,source=/tmp/gsplat/dist,target=/gsplat-dist \
+    pip install --no-cache-dir /gsplat-dist/*.whl
+
+RUN --mount=from=gsplat-builder,source=/tmp/fused-ssim/dist,target=/fused-ssim-dist \
+    pip install --no-cache-dir /fused-ssim-dist/*.whl
+
+RUN --mount=from=gsplat-builder,source=/tmp/simple-knn/dist,target=/simple-knn-dist \
+    pip install --no-cache-dir /simple-knn-dist/*.whl
+
+RUN pip install --no-cache-dir "kornia>=0.7" \
+    && python3 -c "import kornia, torch; assert torch.version.cuda, 'CUDA torch clobbered'; print('kornia', kornia.__version__, 'torch', torch.__version__)"
+
+# LPIPS is a scientific endpoint metric. The image carries only the manifest;
+# model checkpoints are external assets because their redistribution terms are
+# unresolved. Users may materialize them explicitly into this mounted path with
+# scripts/materialize_eval_assets.py. Runtime loading remains fail-closed.
+ENV ELIGSIR_EVAL_ASSET_DIR=/opt/eligsir/eval-assets
+VOLUME ["/opt/eligsir/eval-assets"]
+
+# =============================================================================
+# STAGE: standalone EliGSiR runtime
+# =============================================================================
+FROM eligsir-deps AS eligsir
+
+# Code-provenance: bake the commit this image was built from. There is no
+# .git in the build context (excluded via .dockerignore), so the image
+# cannot introspect its own source commit at build time — it must be passed
+# in explicitly via --build-arg from the HOST doing the build, e.g.:
+#   podman build -f Dockerfile.cuda -t eligsir:cuda-dev \
+#     --build-arg GIT_COMMIT=$(git rev-parse HEAD) .
+# Consumed by ablator's dispatch-time drift check (provenance.py /
+# runner.py) via `podman inspect`/`skopeo inspect` LABEL lookup, and by
+# anyone shelling into the container via the baked /workspace/eligsir/
+# .build_commit file. Defaults to "unknown" if omitted so a forgotten
+# --build-arg is visible rather than silently absent.
+ARG GIT_COMMIT=unknown
+LABEL org.opencontainers.image.revision=${GIT_COMMIT}
+
+WORKDIR /workspace/eligsir
+
+COPY arguments ./arguments
+COPY contracts ./contracts
+COPY gaussian_renderer ./gaussian_renderer
+COPY geometry ./geometry
+COPY lpipsPyTorch ./lpipsPyTorch
+COPY loop_closure ./loop_closure
+COPY scene ./scene
+COPY slam ./slam
+COPY streaming ./streaming
+COPY eligsir ./eligsir
+COPY utils ./utils
+COPY viz ./viz
+COPY configs ./configs
+COPY scripts ./scripts
+COPY train.py train_streaming.py render.py convert.py metrics.py full_eval.py ./
+COPY pyproject.toml environment.yml ./
+
+RUN echo "${GIT_COMMIT}" > /workspace/eligsir/.build_commit
+
+EXPOSE 9876
+
+CMD ["bash"]

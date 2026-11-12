@@ -1,0 +1,91 @@
+# syntax=docker/dockerfile:1.7
+
+FROM python:3.12-slim AS ci-sim
+
+ARG PYTORCH_VERSION=2.10.0
+ARG TORCHVISION_VERSION=0.25.0
+ARG TORCHAUDIO_VERSION=2.10.0
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/workspace/eligsir \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /workspace/eligsir
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+      git \
+      libglib2.0-0 \
+      libgl1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# CPU-only Torch is the point of this image: exercise Torch-dependent runtime
+# and contract code without pulling the ~20 GB ROCm training image or reserving
+# a GPU. Device-dependent CUDA/HIP correctness remains a separate qualification
+# surface.
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    python -m pip install --upgrade pip \
+    && python -m pip install \
+      --index-url https://download.pytorch.org/whl/cpu \
+      "torch==${PYTORCH_VERSION}" \
+      "torchvision==${TORCHVISION_VERSION}" \
+      "torchaudio==${TORCHAUDIO_VERSION}" \
+    && python -m pip install \
+      "numpy<2" \
+      plyfile \
+      tqdm \
+      rich \
+      jaxtyping \
+      pillow \
+      pyyaml \
+      pytest \
+      pytest-cov \
+      pydantic \
+      opencv-python-headless \
+      kornia \
+      tensorboard \
+      scipy \
+      matplotlib \
+      h5py \
+      psutil
+
+# benchmarks/ (CI ImportError fix) -- tests/test_true_camera_scaling_benchmark.py
+# imports `benchmarks.true_camera_scaling` directly; without this COPY, pytest
+# collection fails with ModuleNotFoundError even though `tests/` is copied below,
+# because `benchmarks/` itself was never part of this image's explicit copy-list.
+COPY arguments ./arguments
+COPY benchmarks ./benchmarks
+COPY contracts ./contracts
+COPY gaussian_renderer ./gaussian_renderer
+COPY geometry ./geometry
+COPY lpipsPyTorch ./lpipsPyTorch
+COPY loop_closure ./loop_closure
+COPY scene ./scene
+COPY slam ./slam
+COPY streaming ./streaming
+COPY eligsir ./eligsir
+COPY utils ./utils
+COPY viz ./viz
+COPY configs ./configs
+COPY scripts ./scripts
+COPY experiments/researchflow ./experiments/researchflow
+COPY tests ./tests
+COPY eval ./eval
+COPY specs ./specs
+COPY contract ./contract
+COPY docs ./docs
+COPY human_launch_scripts ./human_launch_scripts
+COPY CLAUDE.md ./
+COPY train.py train_streaming.py render.py render_report.py metrics.py compare_maps.py full_eval.py scene_extent_report.py ./
+COPY pyproject.toml ./
+COPY Dockerfile Dockerfile.cuda Dockerfile.ci-cpu Dockerfile.ci-sim docker-compose.yml ./
+COPY .github/workflows ./.github/workflows
+
+RUN python - <<'PY'
+import torch
+assert torch.cuda.is_available() is False, "ci-sim must remain device-free"
+print("ci-sim torch", torch.__version__, "device=cpu")
+PY
+
+CMD ["python", "-m", "pytest", "-q", "-rs", "tests/test_dev_simulation_lane.py", "tests/test_issue1075_mapping_session.py", "tests/test_issue1075_cadence_contract.py", "tests/test_issue1075_replay_session.py"]

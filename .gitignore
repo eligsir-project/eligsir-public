@@ -1,0 +1,53 @@
+output/
+data/
+# `data/` above is a BARE pattern: it matches a directory named `data` at ANY
+# depth, not just the repo-root dataset dir it was written for. That silently
+# swallowed docs/visuals/data/*.csv -- PR #781 added two plot specs to
+# docs/visuals/plots.json naming CSVs that `git add` then ignored, so the specs
+# merged referencing files that existed only on the author's machine and
+# `mkdocs build --strict` died with FileNotFoundError on main. The one pre-existing
+# file there had been force-added, which hid the trap. Un-ignore the directory so
+# a plain `git add` works and this cannot recur.
+!docs/visuals/data/
+*.log
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.test_venv/
+.pytest_cache/
+*.pth
+*.ply
+*.egg-info/
+dist/
+build/
+.eggs/
+# ROS2 colcon overlay build artefacts (eligsir_ros lives under ros2_ws/src/)
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+site/
+.mypy_cache/
+.ruff_cache/
+*.so
+*.o
+core.*
+.worktrees/
+.claude/worktrees/
+monitor_out/
+
+# Session scratch (snapshots, vendored msg/pkg copies)
+/tmp/
+tmp/
+.codegraph/
+eligsir-orbslam3-src/
+
+# Generated documentation products (rebuilt by scripts/mkdocs_hook.py)
+docs/reference/api/
+docs/DOCUMENTATION_INDEX.md
+docs/visuals/generated/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

@@ -1,0 +1,9 @@
+# Settings shared by every arm in examples/runs/ablation/plan.json.
+viewer: none
+streaming_report_final: true
+streaming_report_test_metrics_max: 16
+streaming_report_train_metrics_max: 16
+
+# Keep common experiment semantics here. Arm files should contain only the
+# deliberate difference under test.
+cap_max: 500000

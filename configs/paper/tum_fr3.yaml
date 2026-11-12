@@ -1,0 +1,39 @@
+# NOT_YET_PAPER_GRADE: conservative public recipe; final paper values are not
+# established by this anonymous snapshot.
+# Dataset kind/sequence: TUM RGB-D / fr3_office. Supply the dataset directory
+# with -s/--source_path; tum_sequence is the retained dataset selector.
+execution_trainer: causal_mapping
+online_mode: false
+streaming_ingestion_mode: dataset_fps
+tum_sequence: fr3_office
+tum_init: rgbd
+tum_frame_stride: 1
+tum_eval_hold: 8
+
+# Replay policy (explicit conservative defaults).
+streaming_replay: false
+streaming_replay_buffer: 512
+streaming_global_replay_ratio: 0.3
+streaming_replay_global_weight_floor: 0.05
+streaming_replay_target_views_per_s: 100.0
+
+# Adaptive supervision policy (retained defaults; not a measured paper claim).
+streaming_mapping_resolution_tier: adaptive
+streaming_mapping_resolution_min_tier: eighth
+streaming_resolution_budget_relax_max: 4.0
+streaming_adaptive_steps_per_insertion: false
+
+# Lazy densification/topology owner (explicit existing controls).
+densification_strategy: gsplat_energy_mcmc
+streaming_insert_from_depth: true
+streaming_depth_sparsity_schedule: fixed
+streaming_mcmc_local_only: true
+streaming_global_maintenance_interval: 200
+
+# Evaluation setup.
+eval: true
+streaming_eval_hold: 8
+streaming_track_primary_psnr: true
+streaming_mapping_holdout_curve: true
+streaming_mapping_holdout_curve_async: true
+streaming_report_test_metrics_max: 128

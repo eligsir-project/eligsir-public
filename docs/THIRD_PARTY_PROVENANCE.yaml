@@ -1,0 +1,215 @@
+schema_version: 1
+document_status: release-gating-record
+disclaimer: >-
+  This manifest records provenance and mechanical notice evidence. It is not
+  legal advice or evidence of commercial/public permission for third-party
+  components. File-level project licensing is recorded in the release-rights
+  document and provenance matrix.
+project_license:
+  eligsir-original:
+    license: Apache-2.0
+    license_status: authorized
+    license_file: LICENSES/Apache-2.0.txt
+    provenance: docs/PROVENANCE_MATRIX.md
+  graphdeco-derived:
+    license: Inria-MPII Gaussian-Splatting research/evaluation license
+    license_status: retained-upstream
+    license_file: LICENSES/GraphDeco-Gaussian-Splatting.txt
+    compatibility_notice: LICENSE.md
+components:
+  - id: chartjs
+    name: Chart.js browser bundle
+    local_paths:
+      - gaussian_renderer/web_viewer/vendor/chart.umd.min.js
+    version: "4.4.7"
+    sha256: 206b6e8bb00fc7bba2c7ee80ca41db3e9e05ba7be0aa35abeba9cfd5357f5d0e
+    license: MIT
+    status: mechanically-noticed
+    release_blocked: false
+    source_urls:
+      - https://github.com/chartjs/Chart.js/releases/tag/v4.4.7
+      - https://github.com/chartjs/Chart.js/blob/master/LICENSE.md
+    evidence: The local bundle header identifies npm chart.js 4.4.7.
+    notice: THIRD_PARTY_NOTICES.md#chartjs
+
+  - id: playcanvas
+    name: PlayCanvas engine bundle
+    local_paths:
+      - gaussian_renderer/web_viewer/vendor/playcanvas.mjs
+    version: "2.18.1"
+    sha256: b088507669ba3d3b375fadcc5c626cb4e4fc137dc47a161fbd8144bbb98db311
+    license: MIT
+    status: mechanically-noticed
+    release_blocked: false
+    source_urls:
+      - https://github.com/playcanvas/engine
+      - https://github.com/playcanvas/engine/blob/main/LICENSE
+    evidence: The local bundle header identifies npm playcanvas 2.18.1.
+    notice: THIRD_PARTY_NOTICES.md#playcanvas
+
+  - id: fused-ssim
+    name: fused-ssim build dependency
+    local_paths:
+      - Dockerfile
+      - Dockerfile.cuda
+      - Dockerfile.cuda-noble
+    source_pin: a7c48d6dd7ac6dc39a7958c7c4452e0b10418f38
+    pin_kind: publication-reproducibility
+    license: MIT
+    status: mechanically-noticed
+    release_blocked: false
+    source_urls:
+      - https://github.com/rahul-goel/fused-ssim
+      - https://github.com/rahul-goel/fused-ssim/blob/main/LICENSE
+    evidence: >-
+      All retained Docker builds default FUSED_SSIM_COMMIT to the full audited
+      current-main commit and shallow-fetch/checkout that object before
+      building. This is the chosen publication reproducibility pin, not
+      historical build provenance.
+    notice_evidence: Copyright (c) Rahul Goel (2024); complete MIT text is retained in THIRD_PARTY_NOTICES.md.
+    notice: THIRD_PARTY_NOTICES.md#fused-ssim
+
+  - id: gsplat-rocm-fork
+    name: EliGSiR gsplat ROCm fork
+    local_paths:
+      - Dockerfile
+      - docker/patch_gsplat_setup.py
+      - docker/patch_gsplat_warp32.py
+    source_pin: c6b363ab9239c958a4ac6619f725119dc8e5706b
+    upstream_base_commit: 937e29912570c372bed6747a5c9bf85fed877bae
+    upstream_base: v1.5.3
+    fork_license: Apache-2.0
+    license: Apache-2.0
+    status: mechanically-noticed
+    release_blocked: false
+    source_urls:
+      - https://github.com/eligsir-project/gsplat-rocm.git
+      - https://github.com/eligsir-project/gsplat-rocm/commit/c6b363ab9239c958a4ac6619f725119dc8e5706b
+      - https://github.com/eligsir-project/gsplat-rocm/blob/c6b363ab9239c958a4ac6619f725119dc8e5706b/LICENSE
+      - https://github.com/eligsir-project/gsplat-rocm/blob/c6b363ab9239c958a4ac6619f725119dc8e5706b/NOTICE
+      - https://github.com/nerfstudio-project/gsplat/tree/v1.5.3
+      - https://github.com/nerfstudio-project/gsplat/blob/v1.5.3/LICENSE
+    evidence: >-
+      The ROCm publication build contract defaults to the neutral
+      eligsir-project/gsplat-rocm repository and resolves the detached checkout
+      to the exact full SHA above. The source at that commit retains the
+      Apache-2.0 fork LICENSE and AMD MIT NOTICE attribution. The declared
+      upstream v1.5.3 base is recorded separately. Repository identity, source
+      publication, and rights evidence are now retained for this public-safe
+      publication reproduction contract. The fork repository remains private
+      until coordinated release; this record does not claim current visibility.
+    notice_evidence: >-
+      The fork LICENSE at the pinned commit is Apache-2.0 and its NOTICE
+      retains AMD MIT attribution; the source and rights evidence are retained
+      in the neutral publication repository, which remains private until
+      coordinated release.
+    delta:
+      - Respect PYTORCH_ROCM_ARCH and add the ROCm GLM include path.
+      - Replace hipified GLM headers with a symlink to the original CUDA GLM tree.
+      - Change ROCm backward rasterization reductions and cooperative-group tiles from wave64 to wave32.
+    notice: THIRD_PARTY_NOTICES.md#gsplat-rocm-fork
+
+  - id: lpips
+    name: LPIPS implementation and evaluation weights
+    local_paths:
+      - lpipsPyTorch/
+      - lpipsPyTorch/eval_assets.json
+    license: BSD-2-Clause
+    source_pin: 016e0ae19ceff83450590738948941a7eb9b95b7
+    downstream_reference_commit: 54c035f7834b564019656c3e3fcc3646292f727d
+    copyright: 2020 Sou Uchida
+    implementation_sha256:
+      lpipsPyTorch/__init__.py: 9badc60275ef4ac502be1875f3010b011da2598fe71999dd16ca20795b289bb3
+      lpipsPyTorch/modules/assets.py: 87c039170e4ce2ea25c02b41cadd825f9ddfb37b6d20b1b4291ead7260d5ee16
+      lpipsPyTorch/modules/lpips.py: 68d3f1647d9d04f849f17a3553f3eb4dbdf2b3164afeaf8147f0eb7e7a4ee201
+      lpipsPyTorch/modules/networks.py: 9c359dd246b974d8199be8d14d92eee0873b2116c78d3f8a7f8fe16ab7581ba5
+      lpipsPyTorch/modules/utils.py: 001d3982de3daf096b6f0f6466d02acb637d9c6365d12ef96ebe27d076faea6b
+    asset_manifest_sha256: c4b3cc4d045ed3a401e6c7b0ab39f7e2c026be72a5386fded1eef0cf99310ad7
+    asset_distribution: external-only
+    runtime_downloads: false
+    docker_inclusion: false
+    calibration_assets:
+      - id: lpips_v0.1_alex
+        sha256: df73285e35b22355a2df87cdb6b70b343713b667eddbda73e1977e0c860835c0
+        source_url: https://raw.githubusercontent.com/richzhang/PerceptualSimilarity/master/lpips/weights/v0.1/alex.pth
+      - id: lpips_v0.1_squeeze
+        sha256: 4a5350f23600cb79923ce65bb07cbf57dca461329894153e05a1346bd531cf76
+        source_url: https://raw.githubusercontent.com/richzhang/PerceptualSimilarity/master/lpips/weights/v0.1/squeeze.pth
+      - id: lpips_v0.1_vgg
+        sha256: a78928a0af1e5f0fcb1f3b9e8f8c3a2a5a3de244d830ad5c1feddc79b8432868
+        source_url: https://raw.githubusercontent.com/richzhang/PerceptualSimilarity/master/lpips/weights/v0.1/vgg.pth
+    imagenet_backbone_assets:
+      - id: alexnet_imagenet1k_v1
+        sha256: 7be5be791159472b1fbf3c69796f7cb30dca7ad8466c2df70058c37116cdee02
+        source_url: https://download.pytorch.org/models/alexnet-owt-7be5be79.pth
+      - id: squeezenet1_1_imagenet1k_v1
+        sha256: b8a52dc049b60e4b6ab68ad0df457362afab8b6304b2febdc1650a5dab4d7e7b
+        source_url: https://download.pytorch.org/models/squeezenet1_1-b8a52dc0.pth
+      - id: vgg16_imagenet1k_v1
+        sha256: 397923af8e79cdbb6a7127f12361acd7a2f83e06b05044ddf496e83de57a5bf0
+        source_url: https://download.pytorch.org/models/vgg16-397923af.pth
+    status: unresolved
+    release_blocked: true
+    source_urls:
+      - https://github.com/S-aiueo32/lpips-pytorch/commit/016e0ae19ceff83450590738948941a7eb9b95b7
+      - https://github.com/graphdeco-inria/gaussian-splatting/commit/54c035f7834b564019656c3e3fcc3646292f727d
+      - https://github.com/richzhang/PerceptualSimilarity
+      - https://github.com/richzhang/PerceptualSimilarity/blob/master/LICENSE
+    evidence: >-
+      Retained implementation files map to S-aiueo32/lpips-pytorch commit
+      016e0ae19ceff83450590738948941a7eb9b95b7 and the GraphDeco downstream
+      reference commit 54c035f7834b564019656c3e3fcc3646292f727d. Local changes
+      are cache/no_grad behavior, weights=None construction, and fail-closed
+      manifest asset loading; exact local hashes are recorded above.
+    blocker: >-
+      LPIPS calibration and PyTorch-hosted ImageNet backbone files are external-only: no model
+      weights are bundled in source releases or Docker images, and no runtime
+      download occurs. Only the upstream redistribution terms remain unresolved;
+      entitled users may materialize assets explicitly into a host-mounted path.
+    notice: THIRD_PARTY_NOTICES.md#lpips
+
+  - id: orbslam3-and-wrapper
+    name: ORB-SLAM3 and ros2_orb_slam3 wrapper
+    local_paths:
+      - eligsir-orbslam3-src/
+    license: GPL-3.0
+    status: unresolved
+    release_blocked: true
+    source_urls:
+      - https://github.com/UZ-SLAMLab/ORB_SLAM3/blob/master/LICENSE
+      - https://github.com/UZ-SLAMLab/ORB_SLAM3/blob/master/Dependencies.md
+      - https://github.com/Mechazo11/ros2_orb_slam3/blob/main/LICENSE
+    evidence: The integration is excluded from shipped counts; local build glue clones the wrapper branch without an immutable commit.
+    blocker: Pin exact ORB-SLAM3 and wrapper sources, retain complete GPL/dependency notices, and obtain a distribution decision.
+    notice: THIRD_PARTY_NOTICES.md#orbslam3-and-wrapper
+
+  - id: rvizsplat
+    name: RVizSplat and gsplat_msgs integration
+    local_paths:
+      - Dockerfile
+      - docker/
+    license: UNKNOWN
+    status: unresolved
+    release_blocked: true
+    source_urls:
+      - https://github.com/eligsir-project/rvizsplat
+    evidence: Docker declarations identify a pinned commit, but the authoritative repository/license page was not retrievable and no local notice is present.
+    blocker: Retain an authoritative license and source snapshot for the declared commit, or remove the optional viewer distribution.
+    notice: THIRD_PARTY_NOTICES.md#rvizsplat
+
+  - id: datasets
+    name: External datasets referenced by loaders and paper configs
+    local_paths:
+      - configs/paper/
+      - eligsir/io/sources/datasets/
+    license: external-terms
+    status: unresolved
+    release_blocked: true
+    source_urls:
+      - https://cvg.cit.tum.de/data/datasets/rgbd-dataset
+      - https://github.com/facebookresearch/Replica-Dataset/blob/main/LICENSE
+      - https://github.com/ScanNet/ScanNet/blob/master/README.md
+      - https://github.com/apple-aiml-research/ml-hypersim/blob/main/README.md
+    evidence: Datasets are not bundled, but loaders/configs name TUM RGB-D, Replica, ScanNet/ScanNet++, and Hypersim.
+    blocker: Keep data external and record each dataset's current terms, attribution, access agreement, and version provenance.
+    notice: THIRD_PARTY_NOTICES.md#datasets

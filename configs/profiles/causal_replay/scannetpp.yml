@@ -1,0 +1,52 @@
+# Finite ScanNet++ (iPhone LiDAR) RGB-D data released causally through the
+# streaming mapper.
+extends: [_shared.yml, ../evaluation/mapping_curves.yml]
+model_path: output/causal_replay_scannetpp
+
+# ScanNet++ v1 (scripts/prepare_scannetpp.py) ships iPhone RGB at whatever
+# resolution the source .mkv reports (not a fixed constant baked into the
+# prep script) plus 192x256 LiDAR depth upsampled to match; the sibling
+# specs repo's scannetpp_resolution_ablation.json (2026-07-27) recorded
+# scene b20a261fdf's native as 1920x1440 -- the largest native frame of the
+# three dataset families here (4x TUM, ~1.4x ScanNet's 1296x968). That same
+# spec's baseline arm ("down960") ran at 960x720, described as "the current
+# default (auto-downscale gate forces 960x720 for this scene's native
+# 1920x1440)" -- i.e. a half-scale reduction, via a --streaming_auto_downscale
+# flag that no longer exists in this codebase (grepped arguments/__init__.py
+# and eligsir/cli/parser.py, 2026-09-08: no match), so it cannot be
+# treated as evidence for today's streaming_mapping_resolution_tier resolver.
+#
+# streaming_mapping_resolution_tier and causal_thread_pinning_policy are
+# deliberately NOT set here: no current-investigation (2026-09-08,
+# PR #1933) measurement exists for ScanNet++ specifically -- only ScanNet's
+# half/pinned combination has a real ablator A/B behind it (see
+# scannet.yml). The historical down960 datapoint is suggestive (same
+# ballpark scale factor as ScanNet's validated half tier) but it is a
+# different resolver on a since-removed flag, not evidence for this one, so
+# it is recorded here for context only, not applied. Leaving these absent
+# inherits ../live/canonical_mapping.yml's `adaptive` mapping tier and
+# arguments/__init__.py's `unbound` thread-pinning default.
+#
+# causal_decode_workers_policy and streaming_payload_budget_policy are left
+# at their code defaults ("fixed" / "resolution_scaled") for the same
+# reason -- both were measured null/unhelpful on ScanNet (the one dataset
+# actually tested; see scannet.yml) and ScanNet++ has no measurement of its
+# own yet, despite being the resolution regime
+# --causal_decode_workers_policy's own help text names as the intended
+# target ("high-resolution sources (e.g. ScanNet++)").
+#
+# streaming_mapping_resolution_tier IS now set below, but as a correctness
+# fix, not a performance claim -- see replica.yml's identical comment for
+# the full mechanism. Inheriting `adaptive` from ../live/canonical_mapping.
+# yml lets admitted frames materialize at mixed resolution tiers within one
+# supervision batch, and eligsir/mapping/renderer/true_camera_batch.py's
+# VECTORIZED_CAMERA_BATCH renderer (this profile's causal_mapping trainer)
+# fail-closes on any such batch ("mixed_resolution_batch_not_supported"),
+# with no sequential fallback permitted. Reproduced live and
+# deterministically on the sibling Replica profile (2026-09-09); ScanNet++
+# extends the identical `adaptive`-inheriting `_shared.yml` base and the
+# same causal_mapping trainer, so it is exposed to the same unconditional
+# crash, independent of any dataset-specific performance question. `half`
+# mirrors ScanNet's own pinned choice as the least-risky starting default;
+# a real ScanNet++ A/B against other fixed tiers is still open.
+streaming_mapping_resolution_tier: half

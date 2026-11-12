@@ -1,0 +1,150 @@
+[project]
+name = "eligsir"
+version = "0.2.0"
+description = "Streaming 3D Gaussian mapping with deterministic runtime contracts"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pydantic>=2",
+    "plyfile",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+bag = [
+    "rosbags",
+]
+dev = [
+    "rich",
+    "jaxtyping",
+    "pytest",
+    "pytest-cov",
+]
+io-image = [
+    "opencv-python-headless",
+]
+# The RealityScan importer is an external, separately licensed dependency.
+# Its private project URL is intentionally not embedded in this export; users
+# who have an authorized importer may install it independently.
+logging = [
+    "tensorboard",
+]
+viewer = [
+    "rerun-sdk>=0.21",
+    "fastapi",
+    "uvicorn[standard]",
+    "websockets",
+]
+viewer-rerun = [
+    "rerun-sdk>=0.21",
+]
+viewer-web-legacy = [
+    "fastapi",
+    "uvicorn[standard]",
+    "websockets",
+]
+preprocess = [
+    "open3d",
+]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocs-awesome-pages-plugin>=2.9,<3",
+    "mkdocstrings[python]>=0.25",
+    "interrogate>=1.7",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# The export intentionally uses a flat layout. Explicit discovery keeps
+# datasets, build output, vendored sources, and campaign directories out of
+# the wheel while retaining the packages used by the public CLI entry points.
+py-modules = ["train", "render", "metrics"]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "eligsir",
+    "eligsir.*",
+    "arguments",
+    "arguments.*",
+    "gaussian_renderer",
+    "gaussian_renderer.*",
+    "geometry",
+    "geometry.*",
+    "scene",
+    "scene.*",
+    "lpipsPyTorch",
+    "lpipsPyTorch.*",
+    "contracts",
+    "contracts.*",
+    "loop_closure",
+    "loop_closure.*",
+    "streaming",
+    "streaming.*",
+]
+exclude = [
+    "tests",
+    "tests.*",
+    "scripts",
+    "scripts.*",
+    "eligsir.mapping.renderer.tests",
+    "eligsir.mapping.renderer.tests.*",
+    "eligsir.optimization.gaussian.tests",
+    "eligsir.optimization.gaussian.tests.*",
+    "eligsir.runtime.tests",
+    "eligsir.runtime.tests.*",
+    "submodules",
+    "submodules.*",
+    "eligsir-orbslam3-src",
+    "eligsir-orbslam3-src.*",
+]
+
+[tool.setuptools.exclude-package-data]
+"*" = [
+    "tests/*",
+    "tests/**/*",
+]
+
+[tool.setuptools.package-data]
+eligsir = ["matplotlibrc"]
+gaussian_renderer = [
+    "web_viewer/index.html",
+    "web_viewer/vendor/chart.umd.min.js",
+    "web_viewer/vendor/playcanvas.mjs",
+]
+lpipsPyTorch = ["eval_assets.json"]
+
+[tool.setuptools.data-files]
+"share/eligsir" = ["LICENSE.md", "NOTICE.md", "THIRD_PARTY_NOTICES.md"]
+
+[project.scripts]
+eligsir = "eligsir.cli.main:main"
+eligsir-train = "eligsir.cli.train:main"
+eligsir-live = "eligsir.cli.live:main"
+eligsir-render = "eligsir.cli.render:main"
+eligsir-eval = "eligsir.cli.eval:main"
+eligsir-session = "eligsir.cli.session:main"
+eligsir-sim = "eligsir.simulation.dev_harness:main"
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = true
+ignore-semiprivate = true
+ignore-private = true
+fail-under = 80
+verbose = 0
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "sim: deterministic CPU/CPU-Torch implementation simulation; valid for merge qualification, never scientific evidence",
+    "hardware: requires a real device, camera, RMW, or other environment-specific substrate; normally qualification, not merge",
+    "scientific: ResearchFlow-managed scientific validation/promotion; never an ordinary implementation merge prerequisite",
+    "slow: long/integration tests that train a model (need container+GPU; opt-in via SPLAT_RUN_SLOW=1)",
+    "cuda: requires a CUDA/ROCm device (run inside the container, not on bare host Python)",
+]

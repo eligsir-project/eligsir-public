@@ -1,0 +1,21 @@
+{
+  "name": "example_cap",
+  "parallel": false,
+  "base": {
+    "type": "replay",
+    "scene": "/data/CHANGE_ME/rgbd_dataset_freiburg3_long_office_household",
+    "iterations": 30000,
+    "machine": "any",
+    "base_args": "--run_profile causal_replay/tum_rgbd"
+  },
+  "arms": [
+    {
+      "id": "control_500k",
+      "extra_args": "--config examples/runs/ablation/configs/control.yml"
+    },
+    {
+      "id": "cap_250k",
+      "extra_args": "--config examples/runs/ablation/configs/cap_250k.yml"
+    }
+  ]
+}

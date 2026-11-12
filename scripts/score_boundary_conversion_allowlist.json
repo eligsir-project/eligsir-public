@@ -1,0 +1,23 @@
+{
+  "sites": {
+    "metrics.py:125": {
+      "classification": "score_path",
+      "reason": "torch.save/.save persist the exact float score artifact; no image codec is involved"
+    },
+    "render.py:80": {
+      "pattern": "torchvision.utils.save_image(",
+      "classification": "visualization",
+      "reason": "render PNG is explicitly visualization-only; metrics read score_tensors/*.pt"
+    },
+    "render.py:81": {
+      "pattern": "torchvision.utils.save_image(",
+      "classification": "visualization",
+      "reason": "GT PNG is explicitly visualization-only; metrics read score_tensors/*.pt"
+    },
+    "utils/score_contract.py:185": {
+      "pattern": ".clamp(",
+      "classification": "explicit_transform",
+      "reason": "the only prediction score-domain clamp is declared and audited before scoring"
+    }
+  }
+}

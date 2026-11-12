@@ -1,0 +1,52 @@
+# EliGSiR default Matplotlib presentation style.
+# Keep scientific semantics in plot owners; this file only controls presentation.
+
+figure.facecolor: white
+figure.edgecolor: white
+figure.dpi: 120
+
+savefig.facecolor: white
+savefig.edgecolor: white
+savefig.dpi: 150
+
+font.family: sans-serif
+font.size: 10.5
+
+axes.facecolor: f4f8fc
+axes.edgecolor: b8c6d3
+axes.linewidth: 0.8
+axes.grid: True
+axes.axisbelow: True
+axes.titlesize: 13
+axes.titleweight: bold
+axes.titlelocation: left
+axes.labelsize: 10.5
+axes.labelcolor: 223047
+axes.prop_cycle: cycler('color', ['2385d9', '20b8c5', '9371df', 'ed6269', '24ac8d', 'e89435', 'd9ac24', 'da609c', '3486dd', '30b8b2'])
+
+xtick.color: 4d6075
+ytick.color: 4d6075
+xtick.labelsize: 9.5
+ytick.labelsize: 9.5
+xtick.major.size: 3.0
+ytick.major.size: 3.0
+
+text.color: 172033
+
+lines.linewidth: 1.8
+lines.markersize: 4.0
+
+patch.edgecolor: 9fb0c1
+patch.linewidth: 0.6
+
+legend.frameon: True
+legend.framealpha: 0.90
+legend.facecolor: white
+legend.edgecolor: c8d4df
+legend.fontsize: 8.5
+
+# Visible but restrained major/minor grids.
+grid.color: cbd5e1
+grid.alpha: 0.52
+grid.linewidth: 0.7
+grid.linestyle: -

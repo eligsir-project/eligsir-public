@@ -1,0 +1,19 @@
+# Compatibility shim for older imports. Reader implementations live in scene/readers/.
+from scene.readers.common import CameraInfo, SceneInfo, fetchPly, fetchPlyFlexible, getNerfppNorm, storePly
+from scene.readers.colmap import readColmapCameras, readColmapSceneInfo
+from scene.readers.blender import readCamerasFromTransforms, readNerfSyntheticInfo
+from scene.readers.rgbd_sequence import readRGBDSequenceSceneInfo
+from scene.readers.tum import readTUMCameras, readTUMSceneInfo
+from scene.readers.scannet import readScanNetCameras, readScanNetSceneInfo
+from scene.readers.replica import readReplicaSceneInfo
+from scene.readers.realityscan import is_realityscan_mobile, readRealityScanSceneInfo
+
+sceneLoadTypeCallbacks = {
+    "Colmap": readColmapSceneInfo,
+    "Blender": readNerfSyntheticInfo,
+    "RGBDSequence": readRGBDSequenceSceneInfo,
+    "Replica": readReplicaSceneInfo,
+    "ScanNet": readScanNetSceneInfo,
+    "TUM": readTUMSceneInfo,
+    "RealityScanMobile": readRealityScanSceneInfo,
+}

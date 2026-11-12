@@ -1,0 +1,10 @@
+# EliGSiR settings for the single Ablator job.
+#
+# Do not put source_path/model_path/iterations here: the Ablator `replay` type
+# supplies those from single.json, making the spec the source of truth for
+# scene, output identity and budget.
+
+viewer: none
+streaming_report_final: true
+streaming_report_test_metrics_max: 16
+streaming_report_train_metrics_max: 16

@@ -1,0 +1,18 @@
+{
+  "streaming_replay": true,
+  "pose_source": "dataset_pose",
+  "viewer": "none",
+  "model_layout": "gsplat",
+  "streaming_camera_profile": "tum_kinect_v1",
+  "streaming_insert_from_depth": true,
+  "streaming_depth_filter_enabled": false,
+  "streaming_depth_temporal_check": false,
+  "streaming_depth_temporal_require_for_insert": false,
+  "streaming_depth_loss_weight": 0.05,
+  "streaming_free_space_loss_weight": 0.0,
+  "streaming_frame_admission": "all",
+  "streaming_sampling_mode": "legacy",
+  "surface_loss_enabled": false,
+  "geometry_prior_mode": "sensor_only",
+  "surface_normal_mode": "finite_difference"
+}

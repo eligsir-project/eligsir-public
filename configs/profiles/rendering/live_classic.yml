@@ -1,0 +1,2 @@
+# Control arm for live antialiasing A/B runs. Pure renderer overlay.
+rasterize_mode: classic

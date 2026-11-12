@@ -1,0 +1,3 @@
+# Largest measured C above 100 renderer transactions/s: C8, 157.8 tx/s.
+streaming_optimization_camera_count_max: 8
+streaming_optimization_transaction_budget_ms: 10

@@ -1,0 +1,163 @@
+# syntax=docker/dockerfile:1.7
+
+FROM python:3.12-slim AS ci-cpu
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/workspace/eligsir
+
+WORKDIR /workspace/eligsir
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml ./
+
+# Keep this image intentionally light. It validates dependency boundaries and
+# non-GPU infrastructure without pulling ROCm, Torch, ROS2, Open3D, or viewers.
+#
+# opencv-python-headless + kornia_rs (issue #418): both are pure CPU-decode
+# dependencies of tests/test_decode_format_color_contract.py (protects the
+# compressedDepth dispatch / JPEG-PNG fallback / RGB-vs-BGR wire-format
+# contract behind #272, which silently regressed once already, #319/#369).
+# Neither pulls torch or any GPU stack -- opencv-python-headless is the same
+# package pyproject.toml's `io-image` extra already declares, and kornia_rs
+# is a standalone Rust binary wheel (its only `torch` reference is a `dev`
+# extra this install does not request) -- so adding them keeps this image's
+# "no ROCm/Torch/ROS2/Open3D/viewers" intent intact.
+#
+# pydantic (issue #423 test-discovery audit): lightweight, pure-python, no
+# GPU/torch pull-through -- unblocks tests/test_cli_config.py (eligsir.cli.
+# config/run_config are torch-free) which was collecting but failing every
+# test with ModuleNotFoundError before this.
+#
+# matplotlib (2026-08-29): #1277 added report plots reached from torch-free
+# modules -- eligsir/runtime/causal_evaluation.py's spatial-replay-focus
+# plot and eligsir/mapping/scheduler/resolution_tier_usage.py's tier-usage
+# heatmap. Their tests collect and run in this image and were failing with
+# ModuleNotFoundError, turning `smoke` red on main. matplotlib ships prebuilt
+# wheels and pulls only numpy/pillow/pyparsing/dateutil/cycler/fonttools/
+# kiwisolver -- no torch, no GPU stack -- so this keeps the image's intent.
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    python -m pip install --upgrade pip \
+    && python -m pip install \
+      numpy \
+      plyfile \
+      tqdm \
+      rich \
+      jaxtyping \
+      pillow \
+      pyyaml \
+      pytest \
+      pytest-cov \
+      opencv-python-headless \
+      kornia_rs \
+      pydantic \
+      matplotlib
+
+# benchmarks/ (CI ImportError fix) -- tests/test_true_camera_scaling_benchmark.py
+# imports `benchmarks.true_camera_scaling` directly; without this COPY, pytest
+# collection fails with ModuleNotFoundError even though `tests/` is copied below,
+# because `benchmarks/` itself was never part of this image's explicit copy-list.
+COPY arguments ./arguments
+COPY benchmarks ./benchmarks
+COPY contracts ./contracts
+COPY gaussian_renderer ./gaussian_renderer
+COPY scene ./scene
+COPY slam ./slam
+COPY streaming ./streaming
+COPY eligsir ./eligsir
+COPY utils ./utils
+COPY viz ./viz
+COPY train.py train_streaming.py ./
+# The remaining top-level entrypoints/tools (2026-08-23). These are needed by
+# tests/test_production_reachability_contract.py, whose gate walks the WHOLE
+# tree: render.py / render_report.py / metrics.py / compare_maps.py etc. are
+# real production callers, so with them absent the checker sees genuinely-wired
+# primitives as unwired and invents violations that do not exist in the repo
+# (confirmed: 5 false failures, e.g. eligsir/io/holdout_gt_exact.py's
+# load_holdout_depth, whose only production caller is render_report.py).
+# scripts/check_production_reachability.py's tree-completeness sentinel turns a
+# future regression here into one actionable message instead of that storm.
+COPY compare_maps.py convert.py export_pointcloud.py full_eval.py metrics.py ./
+COPY render.py render_report.py ./
+COPY scene_extent_report.py ./
+# The production-reachability contract manifest (ledger + grandfathered
+# baseline) read by scripts/check_production_reachability.py.
+COPY contract ./contract
+COPY CLAUDE.md ./
+COPY tests ./tests
+# The `smoke` CI job has NO checkout step -- it runs the files baked in here.
+# tests/test_defaults_reference_freshness.py imports scripts/dump_default_config.py
+# and reads configs/profiles/defaults.reference.yml off disk, so both must be
+# present in the image or that test dies with ImportError/FileNotFoundError.
+COPY scripts ./scripts
+COPY configs ./configs
+# The issue #1365 qualification-launcher contract validates its checked-in
+# ResearchFlow manifests and trusted profile.  The smoke job has no checkout,
+# so ship the small manifest directory rather than letting those tests inspect
+# an incomplete repository image.
+COPY experiments/researchflow ./experiments/researchflow
+# issue #423 test-discovery audit: these three top-level packages/data files
+# were never copied into this image at all (distinct from "needs torch") --
+# each is small, torch-free at the leaf modules the tests below actually
+# exercise, and was unblockable no matter what pytest invocation ran.
+#   geometry/    -- tests/test_getattr_fallback_freshness.py's guarded-flags
+#                   scan reads geometry/sensor_depth.py's source text directly
+#                   (no import); tests/test_fast_nanmedian.py /
+#                   tests/test_scene_complexity.py still need torch via
+#                   geometry/__init__.py -> geometry/priors.py (see the
+#                   lazy-import fix in geometry/__init__.py) so stay ignored.
+#   loop_closure/ -- loop_closure/pose_graph.py is pure numpy; only
+#                    loop_closure/submap_correction.py needs torch (still
+#                    ignored at the test level below).
+#   eval/scenes.json -- utils/partition_eval.py's registry_n_source_frames()
+#                        reads this at runtime; tests/test_coverage_and_
+#                        termination.py's TestRegistryLookup asserted real
+#                        values and got None for every scene with it absent.
+COPY geometry ./geometry
+COPY loop_closure ./loop_closure
+COPY eval/scenes.json ./eval/scenes.json
+#   specs/ -- pure JSON, no imports. tests/test_execution_semantics.py's
+#             additivity proof (test_no_existing_spec_job_trips_a_hard_error)
+#             globs specs/*.json and asserts >100 arms resolve without a hard
+#             error, so with the directory absent it did not merely under-cover:
+#             it FAILED in CI with "only 0 arms found -- proof looks vacuous".
+#             1.4 MB of text across ~293 files; deliberately copied rather than
+#             skipping the test, because a skip would turn the one check that
+#             proves refusal cannot brick the live ablator queue into a no-op.
+COPY specs ./specs
+#   docs/inventory/ -- issue #182's machine-readable option-audit artifacts.
+#             tests/test_option_inventory_freshness.py reads
+#             option_inventory.json / option_inventory_summary.json off disk to
+#             assert the audit still covers every argparse option. Copying ONLY
+#             docs/inventory (not all of docs/, which is large and otherwise
+#             unused here) keeps the lean image lean. Without this the test does
+#             not skip -- it FAILS with FileNotFoundError, the same trap the
+#             scripts/ + configs/ note above exists to prevent.
+COPY docs/inventory ./docs/inventory
+# tests/test_issue871_pairing_telemetry_modes.py currently reads bag-launch
+# scripts from disk; keep the scripts available until their ROS-owned replacement
+# lands and the corresponding test migrates with it.
+COPY human_launch_scripts ./human_launch_scripts
+# tests/test_git_provenance_env_passthrough.py parses docker-compose.yml to
+# assert the remaining core `train` service declares the
+# ELIGSIR_GIT_COMMIT/BRANCH passthrough (#891/#784).
+COPY docker-compose.yml ./
+# tests/test_core_ros_build_boundary.py reads the core Dockerfile and the two
+# image-build workflows as TEXT to assert #1076's ROS hard cut has not been
+# undone. Without these the guard raised FileNotFoundError in the CI image
+# while passing in a dev checkout (issue #1094) -- same lockstep rule the
+# docker-compose.yml COPY above exists for.
+COPY Dockerfile ./
+# This file itself: tests/test_production_reachability_contract.py's
+# test_ci_cpu_image_ships_every_tree_sentinel reads its COPY list off disk to
+# keep it from drifting away from the gate's tree-completeness sentinels.
+# Deliberately a hard failure rather than a skip when absent -- a silently
+# skipped drift guard is how the COPY list got out of sync in the first place.
+COPY Dockerfile.ci-cpu ./
+COPY .github/workflows ./.github/workflows
+
+CMD ["python", "-m", "pytest", "-q", "tests/"]

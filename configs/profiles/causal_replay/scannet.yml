@@ -1,0 +1,43 @@
+# Finite ScanNet RGB-D data released causally through the streaming mapper.
+extends: [_shared.yml, ../evaluation/mapping_curves.yml]
+model_path: output/causal_replay_scannet
+
+# ScanNet native color is 1296x968 (depth 640x480, registered to color on
+# ingest -- see eligsir/io/sources/datasets/scannet.py). half is the only
+# mapping-resolution tier this investigation's own measurements exercised for
+# ScanNet (docs/superpowers/specs/2026-09-08-residency-budget-design.md: same
+# rtx4070/B16/half recipe, TUM fr3 154 v/s vs ScanNet 57 v/s; the quarter-tier
+# ScanNet variant only reached 67 v/s, so pixels are not the limiter at that
+# point) -- do not raise or lower this tier without a matching measurement.
+streaming_mapping_resolution_tier: half
+
+# VALIDATED (this investigation, 2026-09-08, PR #1933): unbound cv2/BLAS
+# threading oversubscribes a 32-core host during decode. The completed
+# pinned-vs-unbound A/B on this exact recipe (ScanNet scene0000_01, rtx4070,
+# causal_decode_workers=8) -- ablator runs scn10_scan_res (unbound) vs
+# scn12_pinned82 (pinned), read from each run's own system_performance.jsonl:
+#   unbound: gpu_util_pct mean 30.4%, cpu_pct_process mean 906% (peak 1827%)
+#   pinned:  gpu_util_pct mean 44.7%, cpu_pct_process mean 381% (peak 1887%)
+# supervision_views_per_s_cumulative was flat (63.8 unbound vs 63.0 pinned) --
+# no throughput regression. This refines (does not contradict) the earlier
+# scn5_decode8 pre-pinning-implementation numbers cited in
+# eligsir/cli/parser.py's --causal_thread_pinning_policy help text
+# (GPU 23.4% / CPU 1012% mean, decode_workers=8, before pinning existed at
+# all) -- both measurements agree on direction: pinning trades a burst of
+# oversubscribed CPU threads for materially higher GPU utilization at flat
+# throughput.
+causal_thread_pinning_policy: pinned
+
+# Deliberately NOT set here (stay at their code defaults):
+#   causal_decode_workers_policy (default "fixed"): "cpu_scaled" was measured
+#     inert for ScanNet -- its own warm-decode calibration (19 ms/frame @
+#     30 Hz) fits inside the 33 ms/frame budget with margin, so `needed` never
+#     exceeds the existing floor of 2 (PR #1933 comment, 2026-09-08).
+#   streaming_payload_budget_policy (default "resolution_scaled"): "residency"
+#     was measured NULL for ScanNet throughput -- scn10_scan_res (residency,
+#     correctly sized, no starvation) measured 63.6 v/s / 5.17 misses/step,
+#     essentially flat vs. the pre-fix resolution_scaled baseline (61.8-62.2
+#     v/s, 5.3-5.4 misses/step); the retraction is recorded in PR #1933's
+#     comments (camera_materialize_cache_misses is governed by a different,
+#     untouched cache layer -- streaming_resolution_cache_max_frames -- not by
+#     the payload/hot-tier budget this policy resolves).

@@ -1,0 +1,133 @@
+name: Engineering / validation task
+description: Track implementation, cleanup, validation, integration, or measured performance work without coupling merge to unrelated qualification.
+title: "Engineering: "
+labels:
+  - "scope:engineering"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Fast-by-default rule:** implementation correctness, device qualification, and scientific promotion are separate completion states. An engineering implementation may close after merge when its deterministic software acceptance contract passes and no known merge-gate defect remains. Hardware/backend validation belongs in the qualification section and does not block merge unless the changed property is inherently device-dependent.
+
+        See `docs/architecture/2026-08-25-fast-by-default-development-policy.md`.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What concrete engineering outcome is needed?
+      placeholder: "Make/validate/measure ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_state
+    attributes:
+      label: Current state
+      description: What is already implemented and what is explicitly unfinished, broken, or unverified?
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Relevant code / plan / status files
+      placeholder: "- path/to/file\n- docs/...\n- #..."
+
+  - type: textarea
+    id: work
+    attributes:
+      label: Implementation work to do
+      description: Keep implementation work separate from later device/scientific qualification.
+      placeholder: "- [ ] ...\n- [ ] ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: merge_acceptance
+    attributes:
+      label: Merge / implementation acceptance contract
+      description: Define the deterministic static, unit, CPU, CPU-Torch simulation, or integration checks required to establish software correctness. Do not add real hardware merely because production eventually runs on hardware.
+      placeholder: "Merge-ready when ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: hardware_impact
+    attributes:
+      label: Hardware impact of the changed property
+      description: Classify the property being changed, not the final deployment location.
+      options:
+        - NONE — hardware cannot affect this property
+        - INHERITED — relevant hardware boundary is unchanged and prior qualification applies
+        - TARGETED — a small post-merge device canary is useful
+        - REQUIRED — the changed property is inherently device/backend dependent
+    validations:
+      required: true
+
+  - type: textarea
+    id: qualification
+    attributes:
+      label: Post-merge device / environment qualification
+      description: Optional or required hardware/backend evidence needed before claiming a device property or enabling a device-specific mode. State `none` or link inherited evidence when applicable. This does not block merge unless hardware impact is REQUIRED for safe enablement.
+      placeholder: "Qualification claim: ...\nTarget hardware/backend: ...\nEvidence needed: ...\nPrior/inherited evidence: ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: gate
+    attributes:
+      label: What does the unresolved work block?
+      options:
+        - gate:merge — software cannot safely integrate yet
+        - gate:qualification — merge is allowed; device/backend claim remains pending
+        - gate:science — merge is allowed; ResearchFlow conclusion/promotion remains pending
+        - gate:none — follow-up only
+    validations:
+      required: true
+
+  - type: textarea
+    id: science_followup
+    attributes:
+      label: Scientific / promotion follow-up
+      description: If method value/default/paper evidence is needed, name the ResearchFlow owner. This is not an engineering merge criterion.
+      placeholder: "ResearchFlow follow-up: #... / none"
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 — blocks current critical path
+        - P1 — important
+        - P2 — opportunistic / future
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - Implementation
+        - Validation
+        - Bug
+        - Cleanup
+        - Performance
+        - Benchmark
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: workflow
+    attributes:
+      label: Workflow checks
+      options:
+        - label: Work will happen on a linked branch/PR rather than by direct feature pushes to main.
+          required: true
+        - label: I separated implementation acceptance from device qualification and scientific promotion instead of making all three one closure gate.
+          required: true
+        - label: If I marked hardware impact REQUIRED, I can state which property cannot be established by deterministic/reference software evidence.
+          required: true
+        - label: If this is a performance task, adoption will depend on end-to-end measured impact rather than an isolated microbenchmark alone.
+          required: false

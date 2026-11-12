@@ -1,0 +1,6 @@
+# Finite TUM RGB-D data released causally through the streaming mapper.
+extends: [_shared.yml, ../evaluation/mapping_curves.yml]
+model_path: output/causal_replay_tum_rgbd
+streaming_camera_profile: tum_kinect_v1
+streaming_depth_filter_enabled: false
+surface_loss_enabled: false

@@ -1,0 +1,4 @@
+# C32 retains most offline throughput; C64 adds only 2.4% over C32 while
+# nearly doubling transaction latency (46.33 ms -> 90.44 ms).
+streaming_optimization_camera_count_max: 32
+streaming_optimization_transaction_budget_ms: 0

@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1.7
+#
+# One-off build for the W3-62 strict-math-vs-fast-math ROCm gsplat ablation.
+# See docs/architecture/2026-08-10-w3-62-*.md. NOT wired into docker-compose
+# or the production Dockerfile -- build manually with --build-arg
+# GSPLAT_FAST_MATH=0 (variant A, strict) or =1 (variant B, fast-math), same
+# base image / patches / flags as the real gsplat-builder stage in the
+# top-level Dockerfile otherwise, so the two wheels differ ONLY in that flag.
+#
+# Usage (from repo root):
+#   docker build -f docker/Dockerfile.gsplat_fastmath_ablation \
+#     --build-arg GSPLAT_FAST_MATH=0 --target export \
+#     -o type=local,dest=/tmp/w362_wheel_A .
+#   docker build -f docker/Dockerfile.gsplat_fastmath_ablation \
+#     --build-arg GSPLAT_FAST_MATH=1 --target export \
+#     -o type=local,dest=/tmp/w362_wheel_B .
+
+ARG ROCM_VERSION=7.2.2
+ARG PYTORCH_VERSION=2.10.0
+ARG ROCM_ARCH=gfx1151
+ARG BASE_ROCM=rocm/pytorch:rocm${ROCM_VERSION}_ubuntu24.04_py3.12_pytorch_release_${PYTORCH_VERSION}
+
+FROM ${BASE_ROCM} AS builder
+
+ARG ROCM_ARCH
+ARG GSPLAT_FAST_MATH=0
+
+ENV HSA_XNACK=1
+ENV HSA_ENABLE_SDMA=0
+ENV PYTORCH_ROCM_ARCH=${ROCM_ARCH}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    cmake \
+    ninja-build \
+    libglm-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp
+
+COPY docker/patch_gsplat_setup.py /tmp/patch_gsplat_setup.py
+COPY docker/patch_gsplat_warp32.py /tmp/patch_gsplat_warp32.py
+COPY docker/patch_gsplat_fastmath_ablation.py /tmp/patch_gsplat_fastmath_ablation.py
+
+# Identical clone/patch/build sequence to the real Dockerfile's gsplat-builder
+# stage, plus the fast-math ablation patch (a no-op on setup.py when
+# GSPLAT_FAST_MATH!=1). -v on bdist_wheel plus a stashed copy of the patched
+# setup.py and the ninja build.ninja file let the comparison doc prove the
+# flag was actually emitted on the real hipcc command line, not just
+# requested.
+RUN git clone --branch release/1.5.3b2 --depth 1 https://github.com/ROCm/gsplat.git /tmp/gsplat \
+    && cd /tmp/gsplat \
+    && git submodule update --init --recursive \
+    && python3 /tmp/patch_gsplat_setup.py \
+    && python3 /tmp/patch_gsplat_warp32.py \
+    && GSPLAT_FAST_MATH=${GSPLAT_FAST_MATH} python3 /tmp/patch_gsplat_fastmath_ablation.py \
+    && cp setup.py /tmp/setup.py.patched \
+    && MAX_JOBS="$(nproc)" python3 setup.py bdist_wheel -v 2>&1 | tee /tmp/build_verbose.log \
+    && (find build -name build.ninja -exec cp {} /tmp/build.ninja \; || true)
+
+FROM scratch AS export
+COPY --from=builder /tmp/gsplat/dist/*.whl /
+COPY --from=builder /tmp/build_verbose.log /
+COPY --from=builder /tmp/setup.py.patched /
+COPY --from=builder /tmp/build.ninja /

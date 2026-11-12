@@ -1,0 +1,2 @@
+# Mip-Splatting EWA antialiasing in gsplat. Pure renderer overlay.
+rasterize_mode: antialiased

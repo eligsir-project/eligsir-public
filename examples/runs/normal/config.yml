@@ -1,0 +1,13 @@
+# Direct-run overlay.
+# Loaded after configs/profiles/default.yml and --run_profile.
+# Explicit CLI flags, if added to run.sh, override values here.
+
+# CHANGE ME: dataset directory visible to the training process/container.
+source_path: /data/CHANGE_ME/rgbd_dataset_freiburg3_long_office_household
+
+# CHANGE ME: unique output directory for this run.
+model_path: /output/example_tum_causal_replay
+
+iterations: 30000
+viewer: none
+streaming_report_final: true

@@ -1,0 +1,262 @@
+# syntax=docker/dockerfile:1.7
+#
+# ROS-FREE CUDA variant on Ubuntu 24.04 (noble) — the CUDA counterpart of the
+# ROCm `latest-gfx1151` / `latest-gfx1201` runtime images.
+#
+# WHY THIS FILE EXISTS (eligsir#1270, eligsir-ros2#67)
+# ------------------------------------------------------------
+# `eligsir-ros2`'s node image builds `FROM ${CORE_IMAGE}` and apt-installs
+# ROS 2 **Jazzy**, which packages.ros.org publishes for Ubuntu 24.04 (noble)
+# ONLY. The two ROCm core images are noble, so the overlay builds on them
+# fine. `Dockerfile.cuda` is NOT: its `pytorch/pytorch:2.9.1-cuda12.8-cudnn9-
+# devel` base is Ubuntu 22.04 (jammy) — verified live on the RTX3090's own
+# `eligsir-cuda:*` image (`VERSION_ID="22.04"`). That single OS mismatch,
+# and nothing else, is why no CUDA node image exists and why the RTX3090
+# cannot run the mapper at all.
+#
+# This file is therefore NOT a replacement for `Dockerfile.cuda`. That image
+# targets the A100 k3s cluster and is validated there; it keeps its jammy
+# conda base and is untouched. This one exists to give the ROS overlay (and
+# any other noble-only consumer) a CUDA core base to build on.
+#
+# WHY NOT EXTEND `Dockerfile.cuda-ros2`
+# -------------------------------------
+# That file already starts `FROM nvidia/cuda:12.8.2-devel-ubuntu24.04` and
+# installs torch 2.9.1+cu128 for exactly this reason, and its `cuda-noble-base`
+# / `gsplat-builder` / `eligsir-deps` stages (reproduced here) are proven
+# working. But its FINAL stage bakes ROS 2 Jazzy + ORB-SLAM3 into a core image
+# — a pre-hard-cut artifact that eligsir#1076 retired. Extending it would
+# re-entrench ROS in core, so the ROS-free half is lifted out here instead and
+# that file is left to be deleted on its own schedule.
+#
+# The stage graph mirrors `Dockerfile.cuda-ros2` minus every ROS stage:
+#   cuda-noble-base -> gsplat-builder ----\
+#                   \-> eligsir-deps --> eligsir
+#
+# BUILD
+#   docker build -f Dockerfile.cuda-noble --target eligsir \
+#     --build-arg GIT_COMMIT=$(git rev-parse HEAD) \
+#     -t eligsir:latest-cuda .
+#
+# The resulting image is consumed by eligsir-ros2 as:
+#   --build-arg CORE_IMAGE=eligsir:latest-cuda \
+#   --build-arg GPU_BACKEND=cuda
+
+# =============================================================================
+# STAGE: CUDA 12.8 + Python + torch on a noble base.
+# =============================================================================
+FROM nvidia/cuda:12.8.2-devel-ubuntu24.04@sha256:7fc48a36965c6d0e5c9717dd899b2851cabb2dfef43d95dd12046a2d40bdc90f AS cuda-noble-base
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-dev \
+    python3-pip \
+    python3-venv \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release \
+    software-properties-common \
+    git \
+    build-essential \
+    cmake \
+    ninja-build \
+    libglm-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3 /usr/bin/python
+
+# python3-dev is required here (unlike Dockerfile.cuda's conda base, which
+# ships headers by default) — nvidia/cuda's python3 package has no headers and
+# gsplat's CUDA extension fails with `fatal error: Python.h: No such file`.
+#
+# nvidia/cuda's Ubuntu 24.04 base is PEP-668 externally-managed; break out of
+# it globally so plain `pip`/`uv pip` install into the system interpreter
+# without --break-system-packages sprinkled through every RUN (mirrors the
+# effect of Dockerfile.cuda's conda base, which has no such restriction).
+RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
+
+RUN pip install --no-cache-dir uv
+
+# Pin torch to the exact version Dockerfile.cuda's pytorch/pytorch base ships
+# (2.9.1) built for this image's CUDA 12.8 toolkit, via the official PyTorch
+# cu128 wheel index. Keeping the two CUDA images on the same torch means a
+# result from one is comparable to a result from the other.
+RUN pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cu128 \
+    torch==2.9.1 torchvision torchaudio \
+    && python3 -c "import torch; assert torch.version.cuda, 'no CUDA torch installed'; print('torch', torch.__version__, 'cuda', torch.version.cuda)"
+
+# =============================================================================
+# STAGE: gsplat/fused-ssim/simple-knn wheel builder (CUDA extensions).
+# =============================================================================
+FROM cuda-noble-base AS gsplat-builder
+
+ARG FUSED_SSIM_COMMIT=a7c48d6dd7ac6dc39a7958c7c4452e0b10418f38
+ARG GSPLAT_COMMIT=937e29912570c372bed6747a5c9bf85fed877bae
+
+# torch.utils.cpp_extension's CUDA-arch autodetection needs a live GPU or an
+# explicit TORCH_CUDA_ARCH_LIST — image builds run on GPU-less hosts, where
+# `_get_cuda_arch_flags()` otherwise returns an empty list and crashes with
+# "IndexError: list index out of range".
+#
+# Unlike Dockerfile.cuda (pinned to the A100 cluster's 8.0), this image is the
+# shared base for every CUDA consumer, so the default covers BOTH real target
+# GPUs: 8.0 = A100, 8.6 = RTX 3090. `+PTX` on the highest arch embeds PTX for
+# JIT forward-compat on newer cards — sm_80 SASS has no guaranteed
+# forward-compat to sm_86 hardware without it. Override for a single-GPU
+# build to cut compile time.
+ARG TORCH_CUDA_ARCH_LIST="8.0;8.6+PTX"
+ENV TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
+
+WORKDIR /tmp
+
+# Upstream (non-ROCm-forked) gsplat — the ROCm Dockerfile clones ROCm/gsplat's
+# patched fork, whose patches are ROCm-specific hipify plumbing.
+RUN git clone --filter=blob:none --no-checkout https://github.com/nerfstudio-project/gsplat.git /tmp/gsplat \
+    && cd /tmp/gsplat \
+    && git fetch --depth 1 origin "${GSPLAT_COMMIT}" \
+    && git checkout --detach "${GSPLAT_COMMIT}" \
+    && git submodule update --init --recursive \
+    && MAX_JOBS="$(nproc)" python3 setup.py bdist_wheel
+
+# fused_ssim's setup.py only branches to a HIP path when torch.version.hip is
+# set, so under CUDA torch it takes the plain CUDAExtension path unmodified.
+RUN git clone --depth 1 https://github.com/rahul-goel/fused-ssim.git /tmp/fused-ssim \
+    && cd /tmp/fused-ssim \
+    && git fetch --depth 1 origin "${FUSED_SSIM_COMMIT}" \
+    && git checkout --detach "${FUSED_SSIM_COMMIT}" \
+    && MAX_JOBS="$(nproc)" pip wheel . --no-build-isolation --no-deps -w /tmp/fused-ssim/dist
+
+# simple_knn: same vendored source as the ROCm build, built directly — no
+# CUDA_HOME=/opt/rocm override, no hipify. Its .cu files guard ROCm-only code
+# behind `#ifndef __HIP_PLATFORM_AMD__`, so under plain CUDA they compile via
+# their original CUDA path with zero changes.
+COPY submodules/simple-knn /tmp/simple-knn
+RUN cd /tmp/simple-knn \
+    && MAX_JOBS="$(nproc)" pip wheel . --no-build-isolation --no-deps -w /tmp/simple-knn/dist
+
+# =============================================================================
+# STAGE: shared EliGSiR Python dependencies.
+# =============================================================================
+FROM cuda-noble-base AS eligsir-deps
+
+# open3d's bundled shared library dynamically links X11/GL runtime libs even
+# for headless use. The ROCm base carries these transitively; neither CUDA
+# base does — found live via a smoke-test failure:
+# "Open3D import failed: libX11.so.6: cannot open shared object file".
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libx11-6 \
+    libgl1 \
+    libgomp1 \
+    libxrender1 \
+    libxext6 \
+    libsm6 \
+    libice6 \
+    libxi6 \
+    libusb-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Lock torch/torchvision/torchaudio to the CUDA builds already installed
+# (defense-in-depth against the resolver pulling a mismatched or CPU-only
+# torch from PyPI later — see memory dockerfile-torch-clobber-rootcause.md).
+RUN python3 - <<'PY' > /etc/pip-torch-constraint.txt
+import importlib.metadata as md
+for name in ("torch", "torchvision", "torchaudio"):
+    try:
+        print(f"{name}=={md.version(name)}")
+    except md.PackageNotFoundError:
+        pass
+PY
+ENV PIP_CONSTRAINT=/etc/pip-torch-constraint.txt
+ENV UV_CONSTRAINT=/etc/pip-torch-constraint.txt
+
+RUN uv pip install --system --no-cache \
+    "numpy<2" \
+    plyfile \
+    tqdm \
+    opencv-python-headless \
+    rich \
+    jaxtyping \
+    rosbags \
+    tensorboard \
+    open3d \
+    h5py \
+    pyrealsense2 \
+    pytest
+
+RUN uv pip install --system --no-cache "rerun-sdk>=0.21" "numpy<2"
+
+RUN --mount=from=gsplat-builder,source=/tmp/gsplat/dist,target=/gsplat-dist \
+    pip install --no-cache-dir /gsplat-dist/*.whl
+
+RUN --mount=from=gsplat-builder,source=/tmp/fused-ssim/dist,target=/fused-ssim-dist \
+    pip install --no-cache-dir /fused-ssim-dist/*.whl
+
+RUN --mount=from=gsplat-builder,source=/tmp/simple-knn/dist,target=/simple-knn-dist \
+    pip install --no-cache-dir /simple-knn-dist/*.whl
+
+RUN pip install --no-cache-dir "kornia>=0.7" \
+    && python3 -c "import kornia, torch; assert torch.version.cuda, 'CUDA torch clobbered'; print('kornia', kornia.__version__, 'torch', torch.__version__)"
+
+# LPIPS is a scientific endpoint metric. The image carries only the manifest;
+# model checkpoints are external assets because their redistribution terms are
+# unresolved. Users may materialize them explicitly into this mounted path with
+# scripts/materialize_eval_assets.py. Runtime loading remains fail-closed.
+ENV ELIGSIR_EVAL_ASSET_DIR=/opt/eligsir/eval-assets
+VOLUME ["/opt/eligsir/eval-assets"]
+
+# =============================================================================
+# STAGE: standalone, ROS-FREE EliGSiR runtime.
+#
+# The layout below (/workspace/eligsir, the GIT_COMMIT label and
+# .build_commit file) is deliberately identical to Dockerfile.cuda's and the
+# ROCm Dockerfile's, because both ablator's dispatch-time drift check and
+# eligsir-ros2's overlay depend on it.
+# =============================================================================
+FROM eligsir-deps AS eligsir
+
+# Code-provenance: bake the commit this image was built from. There is no .git
+# in the build context (excluded via .dockerignore), so it must be passed in
+# explicitly via --build-arg from the HOST doing the build. Consumed by
+# ablator's dispatch-time drift check via image LABEL lookup, and by anyone
+# shelling in via /workspace/eligsir/.build_commit. Defaults to "unknown"
+# so a forgotten --build-arg is visible rather than silently absent.
+ARG GIT_COMMIT=unknown
+LABEL org.opencontainers.image.revision=${GIT_COMMIT}
+
+WORKDIR /workspace/eligsir
+
+COPY arguments ./arguments
+COPY contracts ./contracts
+COPY gaussian_renderer ./gaussian_renderer
+COPY geometry ./geometry
+COPY lpipsPyTorch ./lpipsPyTorch
+COPY loop_closure ./loop_closure
+COPY scene ./scene
+COPY slam ./slam
+COPY streaming ./streaming
+COPY eligsir ./eligsir
+COPY utils ./utils
+COPY viz ./viz
+COPY configs ./configs
+COPY scripts ./scripts
+COPY train.py train_streaming.py render.py convert.py metrics.py full_eval.py ./
+COPY pyproject.toml environment.yml ./
+
+RUN echo "${GIT_COMMIT}" > /workspace/eligsir/.build_commit
+
+# This image is ROS-free by contract (eligsir#1076). Assert it, so a
+# future edit that pulls in rclpy transitively fails the build here rather
+# than silently re-crossing the boundary that eligsir-ros2 depends on.
+RUN python3 -c "\
+import importlib.util, sys; \
+ros = [m for m in ('rclpy', 'gsplat_msgs', 'ament_index_python') if importlib.util.find_spec(m)]; \
+sys.exit('ROS packages leaked into the ROS-free core image: %s' % ros) if ros else None; \
+print('core CUDA image is ROS-free')"
+
+EXPOSE 9876
+
+CMD ["bash"]

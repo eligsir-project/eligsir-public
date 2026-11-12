@@ -1,0 +1,21 @@
+EliGSiR publication license index
+=================================
+
+This file is an index only. It is not a blanket license and does not apply uniformly to every file in this source export.
+
+* Files classified as `eligsir-original` (EliGSiR-original) in
+  [`docs/PROVENANCE_MATRIX.md`](docs/PROVENANCE_MATRIX.md) are available under
+  the Apache License, Version 2.0. The complete text is in
+  [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt).
+* Files classified as `graphdeco-derived` (GraphDeco-derived) retain the upstream
+  Inria/MPII/GRAPHDECO Gaussian-Splatting research/evaluation and
+  non-commercial terms. The complete text is in
+  [`LICENSES/GraphDeco-Gaussian-Splatting.txt`](LICENSES/GraphDeco-Gaussian-Splatting.txt)
+  and remains available as [`LICENSE.md`](LICENSE.md) for upstream headers.
+* Third-party components retain their own upstream terms and notices. Their
+  provenance, scope, and unresolved release blockers are recorded in
+  [`docs/THIRD_PARTY_PROVENANCE.yaml`](docs/THIRD_PARTY_PROVENANCE.yaml) and
+  [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+Read the file-level provenance record and applicable notices before using or
+redistributing any component of this export.

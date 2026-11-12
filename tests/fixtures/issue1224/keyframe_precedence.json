@@ -1,0 +1,51 @@
+[
+  {
+    "name": "bootstrap_new_content",
+    "baseline": null,
+    "candidates": [{"index": 0, "x": 0.0, "timestamp": 0.0}],
+    "overlap": 0.5,
+    "expected": {"admitted": true, "reason": "new_content", "trigger": "normal"}
+  },
+  {
+    "name": "motion_pregate_reject",
+    "baseline": {"index": 0, "x": 0.0, "timestamp": 0.0},
+    "candidates": [{"index": 1, "x": 0.0, "timestamp": 0.03333333333333333}],
+    "overlap": 0.5,
+    "expected": {"admitted": false, "reason": "no_motion", "trigger": "normal"}
+  },
+  {
+    "name": "soft_backstop_legacy_force",
+    "baseline": {"index": 0, "x": 0.0, "timestamp": 0.0},
+    "config": {"max_gap": 2, "max_gap_hard_mult": 2.0},
+    "candidates": [{"index": 2, "x": 0.0, "timestamp": 0.06666666666666667}],
+    "overlap": 0.05,
+    "expected": {"admitted": true, "reason": "max_gap", "trigger": "soft_max_gap"}
+  },
+  {
+    "name": "soft_backstop_preserves_overlap_precedence",
+    "baseline": {"index": 0, "x": 0.0, "timestamp": 0.0},
+    "config": {"max_gap": 2, "max_gap_hard_mult": 2.0, "max_gap_force_scope": "motion_only"},
+    "candidates": [{"index": 2, "x": 0.0, "timestamp": 0.06666666666666667}],
+    "overlap": 0.05,
+    "expected": {"admitted": false, "reason": "low_overlap", "trigger": "soft_max_gap"}
+  },
+  {
+    "name": "hard_backstop_is_unconditional",
+    "baseline": {"index": 0, "x": 0.0, "timestamp": 0.0},
+    "config": {"max_gap": 2, "max_gap_hard_mult": 2.0, "max_gap_force_scope": "motion_only"},
+    "candidates": [{"index": 4, "x": 0.0, "timestamp": 0.13333333333333333}],
+    "overlap": 0.05,
+    "expected": {"admitted": true, "reason": "max_gap", "trigger": "hard_starvation_ceiling"}
+  },
+  {
+    "name": "velocity_target_rate_controls_motion",
+    "baseline": {"index": 0, "x": 0.0, "timestamp": 0.0},
+    "config": {"max_gap": 1000, "velocity_adaptive": true, "velocity_ema_alpha": 1.0, "target_admit_rate_fps": 2.0},
+    "candidates": [
+      {"index": 1, "x": 0.01, "timestamp": 0.03333333333333333},
+      {"index": 2, "x": 0.02, "timestamp": 0.06666666666666667}
+    ],
+    "overlap": 0.5,
+    "expected": {"admitted": false, "reason": "no_motion", "trigger": "normal", "target_interval_s": 0.5}
+  }
+]

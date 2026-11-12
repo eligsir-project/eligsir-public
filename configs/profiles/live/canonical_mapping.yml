@@ -1,0 +1,133 @@
+extends:
+  - ../default.yml
+
+# Canonical MappingApplication policy. Producers own bounded transport queues and
+# transport-drop reporting; core owns the post-tracking semantic disposition.
+model_layout: gsplat
+execution_trainer: causal_mapping
+# One optimizer transaction supervises four true cameras. The mapper clock is
+# independent of source arrival: admitted work fills 1-new/3-replay or
+# pressure-biased 3-new/1-replay transactions, and idle ticks use four replay
+# views. This is supervised views per transaction, not four optimizer steps.
+streaming_optimization_batch_size: 4
+streaming_insert_from_depth: true
+# The promoted live composition enters the accelerator domain once and must
+# fail closed instead of selecting the legacy NumPy insertion planner.
+gpu_frame_prep: true
+gpu_frame_resident: true
+
+# Explicit live residency bounds. Pose-bearing admitted cameras remain in the
+# scene for trajectory/accounting, while non-replayable RGB-D payloads are
+# retired. streaming_live_admitted_payload_max_frames is now derived from
+# source resolution by default (via --streaming_payload_budget_policy); omit it
+# to enable resolution-aware defaults, or specify explicitly to override.
+# The other values are load-bearing in the production constructor.
+streaming_live_cold_payload_max_frames: 128
+streaming_live_cold_payload_max_bytes: 2147483648
+streaming_sensor_depth_cache_max_frames: 128
+# Four reusable slots across adaptive RGB/depth H2D, RGB D2H, and packed
+# insertion pools require 537,744,256 bytes for native 1200x680 B4. Keep a
+# finite 640 MiB ceiling so the promoted adaptive-to-native lifecycle fits
+# without weakening the fail-closed transfer owner.
+streaming_max_transfer_bytes: 671088640
+
+# The producer may report transport loss, but every delivered packet receives
+# exactly one terminal core disposition before materialization. Causal mode is
+# required here because a live submit cannot wait for lookahead cohort closure.
+streaming_frame_admission: preselected
+streaming_backpressure: true
+streaming_backpressure_resolution_mode: causal
+streaming_backpressure_max_admissions_per_window: 6
+streaming_eval_hold: 0
+streaming_eval_guard: 0
+
+# Keep every other optional/adaptive camera-sampling controller as an evidence
+# provider until it has a payload-residency contract of its own.
+streaming_keyframe_coverage: 0.0
+streaming_keyframe_velocity_adaptive: false
+streaming_keyframe_quality_adaptive: false
+streaming_keyframe_coverage_gain_gate: false
+streaming_consolidation_sampler: "off"
+streaming_partition_focus_weight: 0.0
+# Behavior-neutral while focus weight is zero. If canonical causal partition
+# control is enabled, only a bounded non-oracle probe refreshed across the
+# available trajectory at each control barrier may actuate replay.
+streaming_partition_focus_signal_source: control_probe
+streaming_partition_focus_control_probe_n: 32
+streaming_residual_replay_weight: 0.0
+streaming_debt_replay: false
+streaming_sampling_mode: legacy
+streaming_spatial_window_enabled: false
+streaming_consolidation_burst: false
+
+# Bootstrap is bounded state, not another queue.
+streaming_initial_frames: 5
+
+# Sparse-first geometry. New observations contribute only a small coarse depth
+# seed; settled replay owns denser occupancy-gated refinement. This keeps a new
+# frame from injecting detailed geometry before it has repeat support.
+streaming_depth_stride: 12
+streaming_seed_voxel_size: 0.12
+streaming_sparse_seed_voxel_size: 0.12
+streaming_insert_voxel_size: 0.12
+streaming_max_new_gaussians_per_frame: 16
+streaming_replay_depth_max_per_event: 64
+streaming_replay_depth_interval: 50
+streaming_replay_depth_voxel_size: 0.03
+
+# The resolution and allocation owners measure a C4 transaction as four
+# supervised views. Live mapping uses the adaptive tier ladder. POST_REFINEMENT
+# resolution is a separate runtime policy: the inherited/default policy is
+# `native`; `bounded` and `progressive` are explicit opt-in run policies. Do not
+# infer the refinement policy from the live mapping tier below.
+streaming_replay_target_views_per_s: 100.0
+streaming_mapping_resolution_tier: adaptive
+streaming_mapping_resolution_min_tier: eighth
+
+# Training-only spatial evidence biases, but never excludes, full-cache replay.
+# A 1.5 m physical cell avoids the overly fragmented 0.5 m debug grid while new
+# stable cells are added naturally as scene coverage expands.
+streaming_spatial_replay_focus: true
+streaming_spatial_replay_focus_cell_size: 1.5
+streaming_spatial_replay_focus_interval: 25
+
+# Keep the production application single-thread-owned. ROS2 already owns the one
+# ingress worker/queue.
+streaming_async_ingest: false
+streaming_batch_ingest: false
+streaming_bounded_queue_pipeline: false
+
+# One promoted numerical path and one promoted topology-mutation owner.
+optimizer_type: selective_adam
+gsplat_sparse_grad: true
+sh_update_interval: 16
+sh_degree_schedule_rgb_pixels: [307200000, 614400000, 921600000]
+densification_strategy: gsplat_energy_mcmc
+energy_mcmc: true
+streaming_training_mode: normal
+
+# The canonical lifecycle labels settled geometry for replay/MCMC decisions.
+# Anchor, soft-lifecycle and spatial-bubble experiment controllers remain off,
+# so gsplat_energy_mcmc is still the only topology-growth owner.
+streaming_lifecycle_enabled: true
+streaming_lifecycle_interval_updates: 8
+streaming_mature_age_frames: 15
+streaming_mature_min_utility: 0.0
+soft_lifecycle_enabled: false
+streaming_spatial_bubble_enabled: false
+streaming_soft_anchor_weight: 0.0
+streaming_mature_anchor_xyz_weight: 0.0
+streaming_mature_anchor_scale_weight: 0.0
+streaming_mature_anchor_opacity_weight: 0.0
+
+# Once ingestion is complete, replay-only MCMC may increase capacity more
+# aggressively. The mutation proposal still crosses the single fail-closed
+# arbiter/backend barrier and can never share a transaction with new-frame or
+# replay-depth insertion.
+streaming_mcmc_post_ingestion_growth_factor_start: 1.5
+
+# Scene-complexity/report workers belong to experiment/report runners rather
+# than the low-latency mapping process.
+streaming_track_scene_complexity: false
+streaming_memory_telemetry: false
+streaming_duty_cycle_telemetry: false

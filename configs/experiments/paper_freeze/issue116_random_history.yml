@@ -1,0 +1,4 @@
+streaming_historical_repair_mode: random_history
+streaming_historical_repair_event_ordinal: 0
+streaming_historical_repair_extra_step_cap: 0
+streaming_historical_repair_frontier_fraction: 0.5

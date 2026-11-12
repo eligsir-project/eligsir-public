@@ -1,0 +1,56 @@
+# CANONICAL BASE *POLICY* PROFILE for all EliGSiR run profiles.
+# Leaf profiles `extends: [../default.yml]` and override per-run keys.
+#
+# ROLE (decided by issue #182 part 2, 2026-08-14 — this file used to sit in an
+# "ambiguous middle state" #182 asked to resolve). This is a small, CURATED set of
+# run-policy keys, deliberately NOT a mirror of argparse and NOT generated. The
+# generated full argparse snapshot is a different file:
+#   configs/profiles/defaults.reference.yml   (enforced by
+#   tests/test_defaults_reference_freshness.py)
+#
+# PRECEDENCE: argparse (arguments/__init__.py) remains the functional source of
+# truth for defaults — a bare CLI run with no --config/--run_profile does NOT load
+# this file at all.
+#
+# The previous header claimed these keys are "kept IN SYNC with the argparse
+# defaults". That was misleading: it reads as a full-parity promise this file does
+# not make. What is actually true, and is now enforced by
+# tests/test_default_profile_role.py, is narrower and checkable:
+#   * every key below is a real argparse dest (a typo'd key would be a silent
+#     no-op, so this is checked rather than trusted);
+#   * every key whose VALUE differs from the argparse default is declared, with a
+#     reason, in that test's INTENTIONAL_DIVERGENCES registry.
+# Measured 2026-08-16: 14 of the 15 keys below equal the argparse default. The one
+# deliberate divergence was `streaming_replay`. It is now retired for production
+# runs and must not be inherited by causal-mapping profiles.
+#
+# If you change an argparse default, re-check this file: an accidental divergence
+# now fails a test instead of silently changing what config-driven runs do.
+
+execution_trainer: causal_mapping
+model_layout: gsplat
+pose_source: dataset_pose
+streaming_insert_from_depth: true
+# #755 promoted the shared GaussianOptimizationEngine; keep the curated profile
+# explicit so config-driven runs cannot silently regress to the compatibility core.
+geometry_prior_mode: sensor_only
+streaming_mapping_resolution_tier: adaptive
+streaming_mapping_resolution_min_tier: eighth
+
+# --- Validated anti-forgetting / anti-haze defaults (2026-06-30) ------------------
+# The live young-Gaussian opacity-starvation fix (the "haze"): online young Gaussians
+# were crushed by opacity_reg before they could build opacity (stuck ~0.004). These
+# let them mature. Validated on kitchen1 live: inside-scene opacity 0.004 -> ~0.8/0.66,
+# train_psnr -> ~21. See docs/streaming-anti-forgetting-defaults.md.
+streaming_young_prot_iters: 400          # young dead-mask exemption (don't prune newborns)
+streaming_young_reg_exempt_iters: 400    # young opacity-reg exemption (the core haze fix)
+streaming_maturity_reg_ramp: true        # ramp opacity-reg pressure by support_count
+streaming_consolidation_burst: true      # immediate multi-view supervision for new keyframes
+# Isolated lifecycle QUIESCENCE only (mature out-of-view Gaussians stop being MCMC-churned).
+# Safe ONLY with mature_anchor weights at 0 and sampling_mode=legacy (the defaults below).
+# The doc-flagged -1.6 dB was the full bundle (anchors + stratified), which stays OFF.
+streaming_lifecycle_enabled: true
+streaming_mature_anchor_xyz_weight: 0.0
+streaming_mature_anchor_scale_weight: 0.0
+streaming_mature_anchor_opacity_weight: 0.0
+streaming_sampling_mode: legacy

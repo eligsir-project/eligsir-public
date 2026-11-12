@@ -1,0 +1,2 @@
+# Control arm: inherits the common 500k capacity unchanged.
+extends: [common.yml]

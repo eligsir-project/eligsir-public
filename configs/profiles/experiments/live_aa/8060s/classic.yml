@@ -1,0 +1,16 @@
+extends:
+  - ../../../causal_replay/tum_rgbd.yml
+  - ../../../hardware/8060s/live_throughput.yml
+  - ../../../rendering/live_classic.yml
+
+# Matched local live-AA experiment contract. Scientific budgets, output paths,
+# seeds, and baseline linkage remain owned by ResearchFlow.
+streaming_input_fps_cap: 30.0
+streaming_resolution: 1
+# A scientific live-AA arm must reserve a frozen causal holdout.  The
+# production live profile intentionally evaluates no frames by default.
+streaming_eval_hold: 8
+streaming_report_final: true
+streaming_report_test_metrics_max: 1000000
+streaming_optimization_constellation_policy: fixed
+streaming_keyframe_max_gap_require_novelty: false

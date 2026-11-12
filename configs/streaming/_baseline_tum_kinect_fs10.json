@@ -1,0 +1,18 @@
+{
+  "streaming_replay": true,
+  "model_layout": "gsplat",
+  "cap_max": 200000,
+  "densification_strategy": "gsplat_energy_mcmc",
+  "streaming_camera_profile": "tum_kinect_v1",
+  "streaming_keyframe_admit_eval_holdouts": true,
+  "streaming_initial_frames": 5,
+  "streaming_keyframe_window": 120,
+  "streaming_replay_buffer": 512,
+  "streaming_global_replay_ratio": 0.3,
+  "streaming_insert_from_depth": true,
+  "streaming_mcmc_local_only": true,
+  "streaming_global_maintenance_interval": 500,
+  "streaming_depth_loss_weight": 0.1,
+  "streaming_free_space_loss_weight": 0.10,
+  "streaming_frame_admission": "all"
+}

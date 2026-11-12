@@ -1,0 +1,5 @@
+{
+    "streaming_insert_voxel_size": 0.005,
+    "mcmc_stop_growth_iter": 30000,
+    "opacity_reg": 0.001
+}

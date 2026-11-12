@@ -1,0 +1,162 @@
+name: Research question / experiment
+description: Track one actionable hypothesis without blocking implementation on paper-grade evidence.
+title: "Research: "
+labels:
+  - "type:research"
+  - "evidence:untested"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use one issue for one primary research question and reuse existing infrastructure.
+
+        **Fast-by-default boundary:** missing paper-grade tooling, cross-validation, real GPU evidence, or representative multi-scene results block only a **conclusive scientific claim/promotion**. They do not block implementation, deterministic tests, instrumentation, or explicitly non-gradeable development probes unless there is a separate `gate:merge` correctness defect.
+
+        Any run used for scientific interpretation remains ResearchFlow-managed. Direct simulation/smoke/debug runs are development evidence only.
+
+        See `docs/architecture/2026-08-25-fast-by-default-development-policy.md` and `.github/RESEARCHFLOW_EXPERIMENT_REQUIREMENT.md`.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal / hypothesis
+      description: State the question and proposed mechanism in a few sentences.
+      placeholder: "Hypothesis: ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_state
+    attributes:
+      label: Current state
+      description: What already exists, and what is the smallest unresolved question?
+      placeholder: "Implemented: ...\nKnown evidence: ...\nMissing: ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: manipulation
+    attributes:
+      label: Manipulation and frozen axes
+      description: What changes in the candidate, and what must stay matched for a later scientific comparison?
+      placeholder: "Changes: ...\nFrozen: ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Primary outcome / decision
+      description: What observation would make this mechanism worth promoting, rejecting, or investigating further?
+      placeholder: "Primary: ...\nGuardrails: ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: fast_path
+    attributes:
+      label: Cheapest implementation / falsification path
+      description: Define the CPU, CPU-Torch simulation, synthetic fixture, tiny complete scene, or other cheapest probe that can prove wiring/manipulation before consuming scarce hardware time.
+      placeholder: "1. unit/reference test\n2. deterministic simulation\n3. only then targeted device/ResearchFlow run if still needed"
+    validations:
+      required: true
+
+  - type: textarea
+    id: manipulation_check
+    attributes:
+      label: Manipulation-success check
+      description: How will we prove the treatment actually changed realized behavior? A config flag alone is not enough for a scientific conclusion.
+      placeholder: "Realized evidence: ...\nMANIPULATION_FAILED if: ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: tooling
+    attributes:
+      label: Scientific tooling readiness
+      description: For a conclusive ResearchFlow run, list claim-critical metrics/tools and known validation/cross-check evidence. `TBD` is allowed: it blocks only scientific adjudication, not implementation or non-gradeable probes.
+      placeholder: "Metric/tool: ...\nValidation/cross-check: ...\nTBD items: ..."
+
+  - type: textarea
+    id: work
+    attributes:
+      label: Work to do
+      description: Keep implementation, qualification, and scientific promotion as separate groups where useful.
+      placeholder: "Implementation:\n- [ ] ...\nQualification (if needed):\n- [ ] ...\nResearchFlow promotion:\n- [ ] ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: implementation_gate
+    attributes:
+      label: Current implementation gate
+      options:
+        - gate:merge — a known software correctness defect still blocks integration
+        - gate:qualification — implementation may merge; device/backend qualification remains
+        - gate:science — implementation may merge; only scientific conclusion/promotion remains
+        - gate:none — no blocking dependency
+    validations:
+      required: true
+
+  - type: dropdown
+    id: hardware_impact
+    attributes:
+      label: Hardware impact of the mechanism/property
+      options:
+        - NONE — deterministic/reference software evidence is sufficient for implementation
+        - INHERITED — hardware boundary is unchanged; prior qualification applies
+        - TARGETED — one small post-merge device canary is useful
+        - REQUIRED — the claim/property is inherently device/backend dependent
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 — current critical path
+        - P1 — important supporting work
+        - P2 — future / opportunistic
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - ICRA
+        - Engineering
+        - Future
+    validations:
+      required: true
+
+  - type: dropdown
+    id: paper
+    attributes:
+      label: Paper relevance
+      options:
+        - Candidate C1
+        - Candidate C2
+        - Candidate C3
+        - Supporting
+        - None / engineering only
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: workflow
+    attributes:
+      label: Workflow checks
+      options:
+        - label: I checked the current implementation before proposing a duplicate subsystem.
+          required: true
+        - label: I will use deterministic/unit/simulation evidence first where it can answer the implementation question.
+          required: true
+        - label: Missing scientific tooling or representative evidence will downgrade the run/claim, not freeze unrelated implementation work.
+          required: true
+        - label: Any conclusive ablation/baseline/benchmark/default/paper result will be ResearchFlow-managed.
+          required: true
+        - label: I will use a linked branch/PR for implementation rather than direct feature work on main.
+          required: true

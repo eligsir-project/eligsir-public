@@ -1,0 +1,5 @@
+# ResearchFlow-only method-freeze arm for #802/#934.
+# Unknown keys fail closed in eligsir.cli.run_config.
+streaming_budgeted_admission: true
+streaming_admission_cohort_max_candidates: 4
+streaming_admission_cohort_max_source_age: 8

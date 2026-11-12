@@ -1,0 +1,103 @@
+name: Public publication validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install publication-contract dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml pydantic pytest numpy plyfile tqdm
+      - name: Install pinned CPU Torch runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          --index-url https://download.pytorch.org/whl/cpu
+          torch==2.5.1+cpu torchvision==0.20.1+cpu
+      - name: Validate public package build
+        run: |
+          mkdir -p "$RUNNER_TEMP/eligsir-wheel"
+          python -m pip wheel --disable-pip-version-check --no-deps . \
+            --wheel-dir "$RUNNER_TEMP/eligsir-wheel"
+      - name: Validate provenance matrix and public workflow policy
+        run: python scripts/check_publication_provenance.py
+      - name: Scan tracked export for identity and credential residue
+        run: python scripts/audit_release_identity.py
+      - name: Audit exact-score image conversion boundaries
+        run: python scripts/audit_image_conversion_sites.py --json
+      - name: Run publication contract tests
+        run: >-
+          python -m pytest -q tests/test_publication_identity.py
+          tests/test_release_preflight.py
+          tests/test_public_source_snapshot.py
+          tests/test_publication_interface.py
+          tests/test_publication_provenance.py
+          tests/test_publication_notices.py
+          tests/test_release_residue.py
+
+      - name: Create history-free source archive and verify fresh root
+        run: |
+          python scripts/export_public_snapshot.py \
+            --output "$RUNNER_TEMP/eligsir-source.tar.gz" \
+            --init-repo "$RUNNER_TEMP/eligsir-clean"
+          python scripts/audit_release_identity.py --root "$RUNNER_TEMP/eligsir-clean" \
+            --require-anonymous-history --all-refs
+      - name: Save private source archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eligsir-source-snapshot
+          path: ${{ runner.temp }}/eligsir-source.tar.gz
+          retention-days: 7
+          if-no-files-found: error
+
+  cpu-audit:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test toolchain
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu \
+            torch==2.5.1+cpu torchvision==0.20.1+cpu
+          python -m pip install --disable-pip-version-check -e '.[dev,io-image,bag]' \
+            pyyaml scipy pandas pillow matplotlib scikit-image trimesh
+      - name: Diagnose full CPU-safe test corpus
+        timeout-minutes: 18
+        run: |
+          set +e
+          OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+          python -m pytest -q tests -m "not cuda and not hardware and not slow and not scientific" \
+            --continue-on-collection-errors --maxfail=40 --tb=short --disable-warnings \
+            > "$RUNNER_TEMP/cpu-audit.log" 2>&1
+          code=$?
+          echo "Full CPU diagnostic exit code: $code"
+          tail -n 160 "$RUNNER_TEMP/cpu-audit.log"
+          exit "$code"
+      - name: Retain CPU diagnostic output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eligsir-cpu-diagnostic
+          path: ${{ runner.temp }}/cpu-audit.log
+          retention-days: 7
+          if-no-files-found: ignore

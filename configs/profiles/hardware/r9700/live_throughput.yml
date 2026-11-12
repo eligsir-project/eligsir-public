@@ -1,0 +1,3 @@
+# Kernel-derived live knee: p95 24.44 ms, 657.6 supervised views/s at C16.
+streaming_optimization_camera_count_max: 16
+streaming_optimization_transaction_budget_ms: 25

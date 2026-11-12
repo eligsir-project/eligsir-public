@@ -1,0 +1,7 @@
+# True all-data-at-start TUM RGB-D reconstruction through train.training.
+# The implicit default policy profile is always prepended by the loader, so this
+# leaf explicitly selects the offline root loop and otherwise contains only
+# settings consumed by that path.
+streaming_replay: false
+execution_trainer: offline_reconstruction
+model_path: output/offline_reconstruction_tum_rgbd

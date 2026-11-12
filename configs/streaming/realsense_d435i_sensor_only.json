@@ -1,0 +1,24 @@
+{
+  "streaming_replay": true,
+  "pose_source": "dataset_pose",
+  "viewer": "none",
+  "model_layout": "gsplat",
+  "streaming_camera_profile": "realsense_d435i",
+  "streaming_insert_from_depth": true,
+  "streaming_min_depth": 0.15,
+  "streaming_max_depth": 6.0,
+  "streaming_depth_stride": 6,
+  "streaming_depth_filter_enabled": true,
+  "streaming_depth_temporal_check": true,
+  "streaming_depth_temporal_require_for_insert": true,
+  "streaming_depth_loss_weight": 0.08,
+  "streaming_free_space_loss_weight": 0.01,
+  "streaming_frame_admission": "hybrid_keyframe",
+  "streaming_keyframe_quality_enabled": true,
+  "streaming_sampling_mode": "stratified",
+  "streaming_sampling_ratios": "0.60,0.20,0.10,0.10",
+  "geometry_prior_mode": "sensor_only",
+  "surface_normal_mode": "pca_plane",
+  "surface_loss_enabled": true
+  ,"streaming_surface_cell_dedup": true
+}

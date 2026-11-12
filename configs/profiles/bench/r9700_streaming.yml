@@ -1,0 +1,39 @@
+# Throughput/perf benchmark profile for the r9700 satellite.
+#
+# ⚠ TWO KNOWN DEFECTS, audited 2026-08-14 (issue #182 part 2, inherited from
+# #168's dispatch readout). Both are BEHAVIOUR-CHANGING to fix, so they are
+# documented here rather than silently altered — see issue #182 for the gated
+# follow-ups. Do not quote a run from this profile as a reproducible benchmark
+# without reading these first.
+#
+#  1. `streaming_ingestion_mode: dataset_fps` is NON-REPRODUCIBLE BY
+#     CONSTRUCTION on a *benchmark* profile. dataset_fps advances a virtual
+#     clock by each iteration's MEASURED WALL TIME
+#     (eligsir/mapping/scheduler/frame_scheduler.py), so how many frames get
+#     released — and therefore how much work the run does — depends on how fast
+#     the machine ran. That makes it circular for a profile whose entire purpose
+#     is measuring machine speed, and it is the same pacing root-caused for
+#     online-mode scene self-deconstruction (issue #302, and the
+#     `map-explosion-isolated-to-online-mode` finding). `iter_based` is the
+#     reproducible choice, but switching it changes every number this profile has
+#     ever produced.
+#
+#  2. `streaming_frame_admission: hybrid_keyframe` is a GATED admission mode, and
+#     this profile does not set `online_mode: true` (it sets false, below). Per
+#     the Run Contracts' full-coverage rule, the rolling-idle coverage-enforcement
+#     path is scoped to online_mode, so a gated-admission run without it gets no
+#     coverage enforcement — the exact combination that rule warns about. (The
+#     rule explicitly does NOT apply to admission=`all` profiles, which is why
+#     causal_replay/tum_rgbd.yml is fine.) Adding online_mode here would also flip
+#     budget/termination semantics, so it is not a safe drive-by edit.
+extends: [../default.yml]
+model_path: output/bench_r9700_streaming
+online_mode: false
+viewer: none
+parallelism_profile: safe
+benchmark_dir: output/bench_r9700_streaming
+cap_max: 500000
+viewer_rviz_max_gaussians: 50000
+streaming_ingestion_mode: dataset_fps
+streaming_frame_admission: hybrid_keyframe
+streaming_depth_filter_enabled: true

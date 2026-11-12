@@ -1,0 +1,94 @@
+# Core EliGSiR runtime only.
+#
+# ROS2, RVizSplat, Zenoh routing, live ROS capture and ROS bag deployment are
+# owned by https://github.com/eligsir-project/eligsir-ros2 after the hard cut.
+# Keeping those services here would create a second deployment path and allow
+# core/ROS configuration to drift.
+#
+# Per-GPU-arch core images remain single-architecture because gsplat kernels and
+# pruned ROCm libraries are built for one ROCM_ARCH at a time.
+#
+# The image and heavy base input are caller-supplied so this file never pulls
+# from a private registry by default. The ROCm gsplat source defaults to the
+# neutral publication fork and exact audited commit; both remain overridable
+# for controlled qualification builds. For a local validation/config pass:
+#   export ELIGSIR_IMAGE=eligsir:local
+#   export BASE_ROCM_PYTHON=registry.example/eligsir-rocm-python@sha256:<digest>
+#   docker compose config --quiet
+# `config --quiet` only parses interpolation; it does not pull/build.
+# For a private coordinated-RC source build, expose `GITHUB_TOKEN` only through
+# the BuildKit/Podman secret id `github_token` (for example,
+# `--secret id=github_token,env=GITHUB_TOKEN` on `docker build`); never use a
+# Docker `ARG`/`ENV` token or persist Git credentials in the image.
+#
+# Strix Halo / RDNA3.5:
+#   docker compose run --rm train ...
+#
+# R9700 / RDNA4:
+#   ELIGSIR_IMAGE=eligsir:latest-gfx1201 PYTORCH_ROCM_ARCH=gfx1201 \
+#     docker compose run --rm train ...
+
+services:
+  train:
+    image: ${ELIGSIR_IMAGE:?Set ELIGSIR_IMAGE to a local or registry image}
+    pull_policy: missing
+    privileged: true
+    security_opt:
+      - "label=disable"
+    group_add:
+      - "video"
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    environment:
+      HSA_XNACK: "1"
+      HSA_ENABLE_SDMA: "0"
+      PYTORCH_ROCM_ARCH: "${PYTORCH_ROCM_ARCH:-gfx1151}"
+      ELIGSIR_GIT_COMMIT: "${ELIGSIR_GIT_COMMIT:-}"
+      ELIGSIR_GIT_BRANCH: "${ELIGSIR_GIT_BRANCH:-}"
+      ABLATOR_EXPERIMENT_DECLARATION_JSON: "${ABLATOR_EXPERIMENT_DECLARATION_JSON:-}"
+      ABLATOR_EXPERIMENT_DECLARATION_SHA256: "${ABLATOR_EXPERIMENT_DECLARATION_SHA256:-}"
+      ABLATOR_JOB_ID: "${ABLATOR_JOB_ID:-}"
+    ports:
+      - "9876:9876"
+      # Viser sidecar publication (--viewer viser, issue #572/#1200/#1385/
+      # #1389/#1404). Host and container ports are explicit and independently
+      # configurable so a host-side 8080 conflict never requires editing this
+      # file. If VISER_CONTAINER_PORT is changed, pass the same value to
+      # --viewer_viser_port; VISER_HOST_PORT controls only the host
+      # publication and may differ freely. Both default to 8080.
+      #
+      # Example, keep the sidecar on container 8080 but expose host 9999:
+      #   VISER_HOST_PORT=9999 docker compose run --rm --service-ports train ...
+      # Example, sidecar itself listens on 9999:
+      #   VISER_HOST_PORT=9999 VISER_CONTAINER_PORT=9999 \
+      #     docker compose run --rm --service-ports train ... --viewer_viser_port 9999
+      - "${VISER_HOST_PORT:-8080}:${VISER_CONTAINER_PORT:-8080}"
+    # Lets the container reach the HOST's Glances REST API (bare-metal
+    # install, see utils/resource_monitor.py / SPLAT_RESOURCE_MONITOR) via
+    # host.docker.internal, on both real Docker Engine (>=20.10, where this
+    # name does not resolve by default on Linux) and podman/podman-compose
+    # (which understands the "host-gateway" special value since podman 4.1).
+    # podman's own host.containers.internal already resolves without this on
+    # its default rootless bridge network, but this entry is what makes the
+    # SAME hostname work under both compose providers.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${DATA_ROOT:-./data}:/data
+      - ${HOME}/.cache/torch:/root/.cache/torch
+      - ./:/workspace/eligsir
+      - ${OUTPUT_ROOT:-./output}:/output
+    working_dir: /workspace/eligsir
+    command: bash
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: eligsir
+      args:
+        BASE_ROCM_PYTHON: "${BASE_ROCM_PYTHON:?Set BASE_ROCM_PYTHON to an immutable base image}"
+        GSPLAT_REPO: "${GSPLAT_REPO:-https://github.com/eligsir-project/gsplat-rocm.git}"
+        GSPLAT_COMMIT: "${GSPLAT_COMMIT:-c6b363ab9239c958a4ac6619f725119dc8e5706b}"
+        INSTALL_RERUN: "true"
+        INSTALL_VISER: "true"
+        ROCM_ARCH: "${PYTORCH_ROCM_ARCH:-gfx1151}"

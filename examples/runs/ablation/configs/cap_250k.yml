@@ -1,0 +1,3 @@
+# Example one-knob ablation: lower only the Gaussian capacity.
+extends: [common.yml]
+cap_max: 250000

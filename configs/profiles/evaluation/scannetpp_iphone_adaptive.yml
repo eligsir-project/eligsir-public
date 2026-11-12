@@ -1,0 +1,70 @@
+# ScanNet++ iPhone-LiDAR evaluation overlay.  Invoke it with the canonical
+# mapping leaf:
+#
+#   --run_profile live/canonical_mapping \
+#   --config configs/profiles/evaluation/scannetpp_iphone_adaptive.yml
+#
+# This keeps the generic RGBDSequenceFrameSource and all canonical mapping
+# defaults intact.  The prepared source is 1920x1440 RGB with 256x192 iPhone
+# depth nearest-neighbour upsampled to the RGB grid, so mapping may adapt its
+# tier but reporting always scores native-resolution heldout cameras. This
+# overlay directly composes the observation-only mapping-curves mixin. Do not
+# use ray_preserving until a depth-to-RGB registration contract exists.
+
+extends: [mapping_curves.yml]
+
+online_mode: false
+viewer: none
+streaming_camera_profile: iphone_lidar
+streaming_ingestion_mode: dataset_fps
+streaming_input_fps_cap: 30.0
+streaming_frame_stride: 1
+streaming_resolution: 1
+
+# Materialize the iPhone profile here because canonical live settings would
+# otherwise outrank profile defaults applied after config loading.
+streaming_min_depth: 0.2
+streaming_max_depth: 5.0
+streaming_depth_consistency_thresh: 0.03
+streaming_depth_edge_threshold: 0.015
+streaming_depth_stride: 4
+streaming_depth_loss_weight: 0.1
+streaming_free_space_loss_weight: 0.01
+streaming_max_new_gaussians_per_frame: 2000
+streaming_keyframe_input_fps: 60.0
+streaming_keyframe_max_gap: 20
+streaming_keyframe_max_gap_require_novelty: true
+
+# Deterministic in-sequence holdout; this is not the DSLR split.
+streaming_eval_hold: 8
+streaming_eval_guard: 0
+streaming_eval_min_baseline_m: 0.03
+streaming_eval_min_angle_deg: 2.0
+streaming_report_final: true
+# Score the deterministic, evenly spaced 128-view cohort from the 993
+# evaluation-only reservations. The managed declaration pins the ordered IDs
+# and hashes; it must never present this native-resolution subsample as a
+# 993-view mean.
+streaming_report_test_metrics_max: 128
+
+# The managed run requires runtime residency and duty-cycle evidence; external
+# ResearchFlow telemetry separately records host power and storage provenance.
+streaming_memory_telemetry: true
+streaming_duty_cycle_telemetry: true
+
+# Native source-depth insertion is authorized only by the existing READY B4
+# contract.  Ordinary replay remains adaptive and no optimizer-path loading is
+# enabled.  Replay-depth insertion is unsupported on this path.
+causal_prepared_ready_b4: true
+causal_prepared_ready_source_insertion: true
+streaming_optimization_constellation_policy: fixed
+streaming_replay_depth_max_per_event: 0
+streaming_admission_prematerialize: false
+
+# Preserve high-resolution source/evaluation identity while reducing mapping
+# work under pressure. The common adaptive floor prepares 240x180 EIGHTH
+# mapping payloads from this 1920x1440 source; reporting and source insertion
+# remain native. Masked resampling is safe for the prepared shared grid;
+# ray_preserving remains prohibited pending registration evidence.
+streaming_mapping_resolution_tier: adaptive
+streaming_resolution_resampling_mode: masked

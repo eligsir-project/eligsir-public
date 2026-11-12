@@ -1,0 +1,15 @@
+# Publication export boundary
+#
+# The campaign runner declaration was intentionally quarantined from this
+# publication snapshot. It named a private checkout, a machine-local path, and
+# a campaign-only minimum commit. Keeping those values here would imply that a
+# fresh publication clone can deploy or audit the private runner.
+#
+# This file remains as a disabled, parseable marker so tooling can distinguish a
+# deliberate quarantine from a missing configuration. The private campaign
+# declaration belongs in the separately controlled experiment checkout.
+
+[runner]
+enabled = false
+status = "quarantined"
+reason = "Campaign runner configuration is not part of the publication export."

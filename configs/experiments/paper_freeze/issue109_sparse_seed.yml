@@ -1,0 +1,4 @@
+# Sparse, high-confidence source-depth seeding; MCMC remains the density owner.
+streaming_sparse_seed_min_confidence: 0.5
+streaming_sparse_seed_voxel_size: 0.02
+streaming_sparse_seed_max_per_frame: 1000

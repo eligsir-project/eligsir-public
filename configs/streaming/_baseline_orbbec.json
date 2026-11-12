@@ -1,0 +1,15 @@
+{
+  "streaming_replay": true,
+  "model_layout": "gsplat",
+  "cap_max": 200000,
+  "densification_strategy": "gsplat_energy_mcmc",
+  "streaming_camera_profile": "orbbec_femto_bolt",
+  "streaming_initial_frames": 5,
+  "streaming_keyframe_window": 120,
+  "streaming_replay_buffer": 512,
+  "streaming_global_replay_ratio": 0.3,
+  "streaming_insert_from_depth": true,
+  "streaming_mcmc_local_only": true,
+  "streaming_global_maintenance_interval": 500,
+  "streaming_frame_admission": "all"
+}

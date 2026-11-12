@@ -1,0 +1,10 @@
+{
+  "streaming_replay": true,
+  "pose_source": "dataset_pose",
+  "viewer": "none",
+  "model_layout": "gsplat",
+  "streaming_camera_profile": "realsense_d435i",
+  "geometry_prior_mode": "sensor_vggt_offline",
+  "surface_normal_mode": "pca_plane",
+  "surface_loss_enabled": true
+}

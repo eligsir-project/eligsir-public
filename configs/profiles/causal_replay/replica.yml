@@ -1,0 +1,54 @@
+# Finite Replica RGB-D data released causally through the streaming mapper.
+extends: [_shared.yml, ../evaluation/mapping_curves.yml]
+model_path: output/causal_replay_replica
+
+# Replica's streaming-compatible layout (generic RGBDSequence: frames.jsonl +
+# intrinsics.json, e.g. /data/Replica/room0) is
+# native 1200x680 -- confirmed both via PIL on a source frame
+# (images/frame000000.jpg -> (1200, 680)) and via intrinsics.json's own
+# width/height fields (2026-09-08). This is distinct from
+# ReplicaFrameSource's separate mesh.ply raycasting path (default 640x480,
+# a synthesized novel-view trajectory, not this dataset's real captured
+# frames) -- do not confuse the two when reasoning about Replica's native
+# resolution.
+#
+# streaming_mapping_resolution_tier and causal_thread_pinning_policy are
+# deliberately NOT set here. This investigation queued a Replica causal
+# A/B (referred to as rep1_ctrl/rep1_prof) but, as of 2026-09-08, no such
+# run exists under ./output/ -- checked directly,
+# not assumed. The two pre-existing Replica causal-mapping attempts on this
+# host (replica_causal_verify_1313_relaxed_20260831,
+# replica_causal_verify_1357_20260831) both predate the thread-pinning flag
+# entirely and one failed at dataset-layout resolution before producing any
+# throughput data. Extrapolating ScanNet's half/pinned result onto Replica
+# because both are "large native frames" would be exactly the kind of guess
+# this investigation's own PR (#1933) has twice had to retract (decode
+# workers, then the payload-budget policy) after measuring it. Leaving these
+# absent inherits ../live/canonical_mapping.yml's `adaptive` mapping tier and
+# arguments/__init__.py's `unbound` thread-pinning default -- both
+# byte-identical to pre-existing behavior -- until a real Replica A/B lands.
+#
+# causal_decode_workers_policy and streaming_payload_budget_policy are also
+# left at their code defaults ("fixed" / "resolution_scaled") for the same
+# reason: no Replica-specific measurement exists, and both policies were
+# measured null/unhelpful on the one dataset (ScanNet) where they were
+# actually tested (see scannet.yml's comments).
+#
+# streaming_mapping_resolution_tier IS now set below, but as a correctness
+# fix, not a performance claim -- these are different categories of
+# decision and this one does not retract the caution above. Inheriting
+# ../live/canonical_mapping.yml's `adaptive` tier (as this profile did
+# until now) lets different admitted frames materialize at different
+# resolution tiers, and eligsir/mapping/renderer/true_camera_batch.py's
+# `supports_true_camera_batch` (the VECTORIZED_CAMERA_BATCH renderer this
+# profile's causal_mapping trainer selects, per its own startup banner)
+# fail-closes -- "mixed_resolution_batch_not_supported" -- the instant a
+# supervision batch spans two tiers, with no sequential fallback permitted.
+# Reproduced live and deterministically (crashed a real GPU run at 5095
+# optimizer steps / 132 v/s and climbing, 2026-09-09): this is not a "which
+# tier is fastest" question the way ScanNet's half/pinned choice was --
+# `adaptive` is unconditionally incompatible with this renderer path, so
+# some FIXED tier is required for the run to complete at all. `native`
+# provides full 1200x680 resolution supervision without mixed-tier batching
+# collisions.
+streaming_mapping_resolution_tier: native

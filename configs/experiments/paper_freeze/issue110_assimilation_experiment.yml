@@ -1,0 +1,5 @@
+# Research experiment configuration; remains opt-in.
+streaming_assimilation_control: true
+streaming_assimilation_dwell_ticks: 3
+streaming_assimilation_max_extra_steps: 2
+streaming_assimilation_max_replay_bias: 2.0

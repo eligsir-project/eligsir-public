@@ -1,0 +1,3 @@
+# These captured sync_node logs are TEST FIXTURES, not run artifacts -- the
+# repo-wide *.log ignore must not hide them (see README.md).
+!*.log

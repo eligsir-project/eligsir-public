@@ -1,0 +1,56 @@
+# RUN INTENT: SMOKE_DEV  (issue #524)
+#
+#   python train.py --run_profile run_intent/smoke_dev -s /data/... -m output/...
+#
+# Purpose: wiring, manipulation, CI and local developer checks.
+#
+# NOT PAPER-GRADE, BY CONSTRUCTION. #524's requirement is that a smoke run must
+# never accidentally look like paper-grade evidence merely because it emitted a
+# report.json. The caps below make that visible in the artifact itself: a run
+# scoring 8 holdout views at 640px is self-evidently not an evidence package.
+# The machine-readable declaration lives in docs/inventory/run_intents.yml
+# (`evidence_grade: non_paper`).
+#
+# WHAT THIS FILE MAY CONTAIN: reporting/telemetry keys ONLY. Every key here must
+# be declared `training_semantics_changed: false` in
+# docs/inventory/promotion_policy.yml, enforced by
+# tests/test_run_intent_profiles.py. An intent that could change admission,
+# replay, losses, MCMC or insertion would make "which intent did this run use" a
+# confound in every comparison.
+#
+# LAYERING: configs/profiles/default.yml is prepended unconditionally by
+# load_cli_config(), so this file inherits the base policy profile (including its
+# one declared argparse divergence, streaming_replay: true). Nothing here is a
+# default change -- selecting this profile is opt-in.
+#
+# DECLARED PENDING (declared, NOT enabled -- see run_intents.yml):
+#   * experiment/task origin provenance   -> blocked on #511
+#   * realized-cadence telemetry          -> blocked on #289 / PR #514
+#   * local spatial/microcell PSNR        -> blocked on #358's graduation gate
+
+# --- Final evaluation: kept, but deliberately cheap ------------------------- #
+# The holdout split itself is untouched (it is reserved deterministically before
+# admission and is a Run Contract invariant, not an intent choice). Only how many
+# of the realized holdout cameras get SCORED is capped -- see issue #420 for why
+# this cap is recorded in report.json's scored_holdout_hash rather than implied.
+streaming_report_final: true
+streaming_report_test_metrics_max: 8
+streaming_report_train_metrics_max: 8
+streaming_report_pre_training: false
+
+# --- Coverage / validity: ON even for smoke -------------------------------- #
+# A run whose trajectory coverage is unknown cannot be interpreted at all, so
+# this is canonical_universal rather than a research-run luxury.
+streaming_trajectory_eval: true
+
+# --- Expensive visual artifacts: reduced ----------------------------------- #
+# #524 lists "FHD videos/contact sheets unless requested" as smoke-reduced.
+streaming_report_trajectory_max_frames: 24
+streaming_report_video_min_width: 640
+streaming_report_video_max_width: 1280
+
+# --- Nothing renders on the ACTIVE training GPU for diagnostics ------------- #
+# #524: expensive diagnostics belong in the final evaluation, not on the
+# training GPU. (Already the argparse default; restated because it is the single
+# most consequential thing a smoke profile must not silently turn on.)
+record_video: false

@@ -1,0 +1,58 @@
+# RUN INTENT: CANONICAL_ONLINE  (issue #524)
+#
+#   python train.py --run_profile run_intent/canonical_online -s /data/... -m output/...
+#
+# Purpose: the normal, trustworthy EliGSiR research run. Trustworthy enough
+# to quote in an issue or a PR; not a publication evidence package (that is
+# run_intent/paper_registered).
+#
+# WHAT THIS FILE MAY CONTAIN: reporting/telemetry keys ONLY, each declared
+# `training_semantics_changed: false` in docs/inventory/promotion_policy.yml and
+# enforced by tests/test_run_intent_profiles.py.
+#
+# LAYERING: configs/profiles/default.yml is prepended unconditionally, so this
+# inherits the base policy profile. Selecting this profile is opt-in and changes
+# no argparse default.
+#
+# EVERY VALUE BELOW EQUALS THE CURRENT ARGPARSE DEFAULT. That is deliberate and
+# it is the honest state of things: the settings CANONICAL_ONLINE would
+# additionally want default-on are all gated on issues that have not closed, so
+# they are DECLARED PENDING rather than switched on here. Restating the defaults
+# explicitly is not redundancy -- it makes the intent's contract legible in one
+# file and makes a future silent default change show up as a divergence in
+# docs/inventory/option_inventory.json's `profile_divergences` column.
+#
+# DECLARED PENDING (declared, NOT enabled -- see docs/inventory/run_intents.yml):
+#   * local spatial/microcell quality       -> blocked on #358 graduation gate
+#   * async latest-only live plots          -> blocked on #480 zero-overhead proof
+#   * PERIODIC GPU-memory telemetry
+#     (streaming_memory_telemetry_interval)  -> blocked on #399 / PR #513 real-GPU validation
+#   * naturally paced trajectory video      -> blocked on #397 / #401
+
+# --- Automatic post-optimization FINAL_EVALUATION --------------------------- #
+streaming_report_final: true
+streaming_report_pre_training: false
+
+# Full standard holdout scoring. #420: this cap is what report.json's
+# scored_holdout_hash fingerprints, so two runs meant to be compared must share
+# it -- another reason a research run should name an intent rather than assemble
+# a CLI string by hand.
+streaming_report_test_metrics_max: 128
+streaming_report_train_metrics_max: 128
+
+# --- Validity / coverage ---------------------------------------------------- #
+streaming_trajectory_eval: true
+streaming_report_trajectory_max_frames: 120
+
+# --- Telemetry that costs nothing on the training path ---------------------- #
+# The on/off flag is graduated (telemetry_only). The PERIODIC SAMPLING form
+# (streaming_memory_telemetry_interval) is NOT set here -- that is #399/PR #513's
+# outstanding gate.
+streaming_memory_telemetry: true
+
+# --- Nothing renders on the ACTIVE training GPU for diagnostics ------------- #
+record_video: false
+
+# --- Report media at standard resolution ------------------------------------ #
+streaming_report_video_min_width: 1920
+streaming_report_video_max_width: 3840

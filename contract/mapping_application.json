@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "factory": "eligsir.runtime.application:create_mapping_application",
+  "application_type": "eligsir.runtime.application:ComposedMappingApplication",
+  "default_profile": "live/canonical_mapping",
+  "application_surface": [
+    "session",
+    "tick",
+    "flush",
+    "close"
+  ],
+  "session_surface": [
+    "submit",
+    "flush",
+    "close"
+  ],
+  "cadence": "submit 0..B packets through session, then call tick exactly once",
+  "production_composition": [
+    "MappingSession",
+    "StreamingScene.ingest_frame",
+    "MappingCoordinator",
+    "GaussianOptimizationEngine",
+    "gsplat_energy_mcmc"
+  ],
+  "single_owners": {
+    "transport_backpressure": "producer boundary (physical transport capacity only)",
+    "packet_order_and_materialization": "MappingSession",
+    "semantic_observation_disposition": "core ObservationOwner / scheduler",
+    "retained_observation_history": "core FrameObservationDB / historical scheduler",
+    "frame_ingest_and_keyframe_bookkeeping": "StreamingScene.ingest_frame",
+    "gaussian_map_backend": "MappingCoordinator",
+    "fixed_topology_optimization": "GaussianOptimizationEngine",
+    "topology_mutation": "gsplat_energy_mcmc"
+  },
+  "production_requires_tracking": true,
+  "production_batch_size": 1,
+  "production_batch_size_semantics": "transport-facing packet-submit cadence per application tick; this is not the optimizer supervision constellation size",
+  "supervision_batch_source": "configs/profiles/live/canonical_mapping.yml:streaming_optimization_batch_size",
+  "transport_free": true,
+  "standalone_production_factory": true,
+  "injected_options_scope": "tests and embedded composition only"
+}
